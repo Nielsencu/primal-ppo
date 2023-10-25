@@ -1,0 +1,9 @@
+.vscode
+.idea/
+__pycache__/
+!spec/*.pyc
+*.pyc
+gifs/
+models/
+wandb/
+
