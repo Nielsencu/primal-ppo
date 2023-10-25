@@ -34,6 +34,7 @@ class TrainingParameters:
     POLICY_COEF = 10
     VALID_COEF = 0.5
     BLOCK_COEF = 0.5
+    COST_LIMIT = 25
     N_EPOCHS = 10
     N_ENVS = 1  # number of processes
     N_MAX_STEPS = 3e7  # maximum number of time steps used in training

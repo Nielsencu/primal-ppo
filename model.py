@@ -20,6 +20,8 @@ class Model(object):
         self.network = SCRIMPNet().to(device)  # neural network
         if global_model:
             self.net_optimizer = optim.Adam(self.network.parameters(), lr=TrainingParameters.lr)
+            self.lagrangian_param = torch.tensor(1.0, requires_grad=True).float()
+            self.lagrangian_optimizer = optim.Adam([self.lagrangian_param], lr=TrainingParameters.lagrangian_lr)
             # self.multi_gpu_net = torch.nn.DataParallel(self.network) # training on multiple GPU
             self.net_scaler = GradScaler()  # automatic mixed precision
 
@@ -98,10 +100,16 @@ class Model(object):
             np.reshape(input_state[:, 1], (-1, NetParameters.NET_SIZE))).to(self.device)
         input_state = (input_state_h, input_state_c)
 
-        advantage = returns - old_v
-        advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-6)
+        normalize_advantage = lambda x : (x-x.mean()) / (x.std() + 1e-6)
+        advantage = normalize_advantage(returns - old_v)
 
         #dp_network = nn.DataParallel(self.network)
+        # TODO: Get constraint returns, old_c and cur_cost from network
+        constraint_returns = 0
+        old_c = 0
+
+        cur_cost = 0
+        cost_advantage = normalize_advantage(constraint_returns - old_c)
 
         with autocast():
             new_ps, new_v, block, policy_sig, _, _ = self.network(observation, vector, input_state)
@@ -134,16 +142,32 @@ class Model(object):
             # blocking_loss = - torch.mean(target_blockings * torch.log(torch.clamp(block, 1e-6, 1.0 - 1e-6))
             #                              + (1 - target_blockings) * torch.log(torch.clamp(1 - block, 1e-6, 1.0 - 1e-6)))
 
+            # penalty loss
+            cost_loss = ratio * cost_advantage
+            cost_loss = cost_loss.mean()
+
+            p = F.softplus(self.lagrangian_param)
+            penalty = p.item()
+
             # total loss
             all_loss = -policy_loss - entropy * TrainingParameters.ENTROPY_COEF + \
                 TrainingParameters.VALUE_COEF * critic_loss  \
                 + TrainingParameters.VALID_COEF * valid_loss \
-                # + TrainingParameters.BLOCK_COEF * blocking_loss
+                + penalty * cost_loss
+                # + TrainingParameters.BLOCK_COEF * blocking_loss \ 
+                
+            all_loss /= (1+penalty)
+            cost_deviation = (cur_cost - TrainingParameters.COST_LIMIT)
+            self.loss_penalty = -self.lagrangian_param * cost_deviation
 
         clip_frac = torch.mean(torch.greater(torch.abs(ratio - 1.0), TrainingParameters.CLIP_RANGE).float())
 
         self.net_scaler.scale(all_loss).backward()
         self.net_scaler.unscale_(self.net_optimizer)
+
+        self.lagrangian_optimizer.zero_grad()
+        self.loss_penalty.backward()
+        self.lagrangian_optimizer.step()
 
         # Clip gradient
         grad_norm = torch.nn.utils.clip_grad_norm_(self.network.parameters(), TrainingParameters.MAX_GRAD_NORM)
