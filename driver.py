@@ -157,8 +157,8 @@ def main():
                     # write_to_wandb(curr_steps, greedy_eval_performance_dict, evaluate=True, greedy=True)
                     write_to_wandb(curr_steps, evalPerformance, evaluate=True, greedy=False)
 
-                print('episodes: {}, step: {},episode reward: {}, human_coll: {}, static_coll: {}, agent_coll: {}, total_goals: {} shadow_goals: {} \n'.format(
-                        curr_episodes, curr_steps, evalPerformance.episodeReward, evalPerformance.humanCollide, 
+                print('episodes: {}, step: {},episode reward: {}, episode cost reward: {} human_coll: {}, static_coll: {}, agent_coll: {}, total_goals: {} shadow_goals: {} \n'.format(
+                        curr_episodes, curr_steps, evalPerformance.episodeReward, evalPerformance.episodeCostReward, evalPerformance.humanCollide, 
                         evalPerformance.staticCollide, evalPerformance.agentCollide, evalPerformance.totalGoals, evalPerformance.shadowGoals)) 
                 # save model with the best performance
                 if RecordingParameters.RECORD_BEST:

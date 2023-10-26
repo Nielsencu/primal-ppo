@@ -21,7 +21,7 @@ class Model(object):
         if global_model:
             self.net_optimizer = optim.Adam(self.network.parameters(), lr=TrainingParameters.lr)
             self.lagrangian_param = torch.tensor(1.0, requires_grad=True).float()
-            self.lagrangian_optimizer = optim.Adam([self.lagrangian_param], lr=TrainingParameters.lagrangian_lr)
+            self.lagrangian_optimizer = optim.Adam([self.lagrangian_param], lr=TrainingParameters.LAGRANGIAN_LR)
             # self.multi_gpu_net = torch.nn.DataParallel(self.network) # training on multiple GPU
             self.net_scaler = GradScaler()  # automatic mixed precision
 
@@ -29,25 +29,25 @@ class Model(object):
         """using neural network in training for prediction"""
         observation = torch.from_numpy(observation).to(self.device)
         vector = torch.from_numpy(vector).to(self.device)
-        ps, v, block, _, output_state, _, constraint_value = self.network(observation, vector, input_state)
+        ps, v, block, _, output_state, _, cv = self.network(observation, vector, input_state)
 
         actions = np.zeros(num_agent)
         ps = np.squeeze(ps.cpu().detach().numpy())
         v = v.cpu().detach().numpy()  # intrinsic state values
         block = np.squeeze(block.cpu().detach().numpy())
-        constraint_value = constraint_value.cpu().detach().numpy()
+        cv = cv.cpu().detach().numpy()
 
         for i in range(num_agent):
             # choose action from complete action distribution
             actions[i] = np.random.choice(range(EnvParameters.N_ACTIONS), p=ps[i].ravel())
-        return actions, ps, v, block, output_state, constraint_value
+        return actions, ps, v, block, output_state, cv
 
     def evaluate(self, observation, vector, input_state, greedy, num_agent):
         """using neural network in evaluations of training code for prediction"""
         eval_action = np.zeros(num_agent)
         observation = torch.from_numpy(np.asarray(observation)).to(self.device)
         vector = torch.from_numpy(vector).to(self.device)
-        ps, v, block, _, output_state, _ = self.network(observation, vector, input_state,)
+        ps, v, block, _, output_state, _, cv = self.network(observation, vector, input_state,)
 
         ps = np.squeeze(ps.cpu().detach().numpy())
         block = np.squeeze(block.cpu().detach().numpy())

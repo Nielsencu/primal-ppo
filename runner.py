@@ -144,8 +144,8 @@ class Runner(object):
                                                         TrainingParameters.GAMMA * TrainingParameters.LAM
                                                         * next_nonterminal * last_gaelam)
                 
-                constraint_delta = np.substract(np.add(mb.constraintRewards[t], TrainingParameters.GAMMA * next_nonterminal *
-                                        next_constraint_values))
+                constraint_delta = np.subtract(np.add(mb.constraintRewards[t], TrainingParameters.GAMMA * next_nonterminal *
+                                        next_constraint_values), mb.constraintValues[t])
                 
                 mb_constraint_advs[t] = last_constraint_gaelam = np.add(constraint_delta, TrainingParameters.GAMMA * TrainingParameters.LAM
                                         * next_nonterminal * last_constraint_gaelam)

@@ -43,6 +43,7 @@ class TrainingParameters:
     N_STEPS = 2 ** 8  # number of time steps per process per data collection
     MINIBATCH_SIZE = int(2 ** 8)
     DEMONSTRATION_PROB = 0  # imitation learning rate
+    LAGRANGIAN_LR = 5e-2
 
 
 class NetParameters:
