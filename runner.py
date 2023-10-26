@@ -110,6 +110,7 @@ class Runner(object):
             mb.observations = np.concatenate(mb.observations, axis=0)
             mb.vectors = np.concatenate(mb.vectors, axis=0)
             mb.rewards = np.concatenate(mb.rewards, axis=0)
+            mb.constraintRewards = np.concatenate(mb.constraintRewards, axis=0)
             mb.values = np.squeeze(np.concatenate(mb.values, axis=0), axis=-1)
             mb.constraintValues = np.squeeze(np.concatenate(mb.constraintValues, axis=0), axis=-1)
             mb.trainValid = np.stack(mb.trainValid)

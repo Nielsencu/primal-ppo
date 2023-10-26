@@ -109,9 +109,7 @@ class Model(object):
         advantage = normalize_advantage(returns - old_v)
 
         #dp_network = nn.DataParallel(self.network)
-        # TODO: Get constraint returns, old_c and cur_cost from network
         cost_advantage = normalize_advantage(constraint_returns - old_cv)
-
         with autocast():
             new_ps, new_v, block, policy_sig, _, _, new_cv = self.network(observation, vector, input_state)
             new_p = new_ps.gather(-1, action)
@@ -176,6 +174,7 @@ class Model(object):
         self.lagrangian_optimizer.zero_grad()
         loss_penalty.backward()
         self.lagrangian_optimizer.step()
+        print("Lagrangian param is now ", self.lagrangian_param.item())
 
         # Clip gradient
         grad_norm = torch.nn.utils.clip_grad_norm_(self.network.parameters(), TrainingParameters.MAX_GRAD_NORM)
