@@ -29,17 +29,18 @@ class Model(object):
         """using neural network in training for prediction"""
         observation = torch.from_numpy(observation).to(self.device)
         vector = torch.from_numpy(vector).to(self.device)
-        ps, v, block, _, output_state, _ = self.network(observation, vector, input_state)
+        ps, v, block, _, output_state, _, constraint_value = self.network(observation, vector, input_state)
 
         actions = np.zeros(num_agent)
         ps = np.squeeze(ps.cpu().detach().numpy())
         v = v.cpu().detach().numpy()  # intrinsic state values
         block = np.squeeze(block.cpu().detach().numpy())
+        constraint_value = constraint_value.cpu().detach().numpy()
 
         for i in range(num_agent):
             # choose action from complete action distribution
             actions[i] = np.random.choice(range(EnvParameters.N_ACTIONS), p=ps[i].ravel())
-        return actions, ps, v, block, output_state
+        return actions, ps, v, block, output_state, constraint_value
 
     def evaluate(self, observation, vector, input_state, greedy, num_agent):
         """using neural network in evaluations of training code for prediction"""
@@ -64,19 +65,20 @@ class Model(object):
         """using neural network to predict state values"""
         obs = torch.from_numpy(obs).to(self.device)
         vector = torch.from_numpy(vector).to(self.device)
-        _, v, _, _, _, _ = self.network(obs, vector, input_state)
+        _, v, _, _, _, _, cv = self.network(obs, vector, input_state)
         v = v.cpu().detach().numpy()
-        return v
+        cv = cv.cpu().detach().numpy()
+        return v, cv
 
     def generate_state(self, obs, vector, input_state):
         """generate corresponding hidden states and messages in imitation learning"""
         obs = torch.from_numpy(obs).to(self.device)
         vector = torch.from_numpy(vector).to(self.device)
-        _, _, _, _, output_state, _ = self.network(obs, vector, input_state)
+        _, _, _, _, output_state, _, _ = self.network(obs, vector, input_state)
         return output_state
 
-    def train(self, observation, vector, returns, old_v, action,
-              old_ps, input_state, train_valid):
+    def train(self, observation, vector, returns, constraint_returns, old_v, old_cv, action,
+              old_ps, input_state, train_valid, episode_cost):
         """train model0 by reinforcement learning"""
         self.net_optimizer.zero_grad()
         # from numpy to torch
@@ -94,6 +96,9 @@ class Model(object):
         train_valid = torch.from_numpy(train_valid).to(self.device)
         # target_blockings = torch.from_numpy(target_blockings).to(self.device)
 
+        constraint_returns = torch.from_numpy(constraint_returns).to(self.device)
+        old_cv = torch.from_numpy(old_cv).to(self.device)
+
         input_state_h = torch.from_numpy(
             np.reshape(input_state[:, 0], (-1, NetParameters.NET_SIZE))).to(self.device)
         input_state_c = torch.from_numpy(
@@ -105,14 +110,10 @@ class Model(object):
 
         #dp_network = nn.DataParallel(self.network)
         # TODO: Get constraint returns, old_c and cur_cost from network
-        constraint_returns = 0
-        old_c = 0
-
-        cur_cost = 0
-        cost_advantage = normalize_advantage(constraint_returns - old_c)
+        cost_advantage = normalize_advantage(constraint_returns - old_cv)
 
         with autocast():
-            new_ps, new_v, block, policy_sig, _, _ = self.network(observation, vector, input_state)
+            new_ps, new_v, block, policy_sig, _, _, new_cv = self.network(observation, vector, input_state)
             new_p = new_ps.gather(-1, action)
             old_p = old_ps.gather(-1, action)
             ratio = torch.exp(torch.log(torch.clamp(new_p, 1e-6, 1.0)) - torch.log(torch.clamp(old_p, 1e-6, 1.0)))
@@ -126,6 +127,13 @@ class Model(object):
             value_losses1 = torch.square(new_v - returns)
             value_losses2= torch.square(new_v_clipped - returns)
             critic_loss = torch.mean(torch.maximum(value_losses1, value_losses2))
+
+            new_cv = torch.squeeze(new_cv)
+            new_cv_clipped = old_cv+ torch.clamp(new_cv - old_cv, - TrainingParameters.CLIP_RANGE,
+                                               TrainingParameters.CLIP_RANGE)
+            value_losses1 = torch.square(new_cv - constraint_returns)
+            value_losses2= torch.square(new_cv_clipped - constraint_returns)
+            critic_loss += torch.mean(torch.maximum(value_losses1, value_losses2))
 
             # actor loss
             ratio = torch.squeeze(ratio)
@@ -143,30 +151,30 @@ class Model(object):
             #                              + (1 - target_blockings) * torch.log(torch.clamp(1 - block, 1e-6, 1.0 - 1e-6)))
 
             # penalty loss
-            cost_loss = ratio * cost_advantage
-            cost_loss = cost_loss.mean()
-
-            p = F.softplus(self.lagrangian_param)
-            penalty = p.item()
+            cost_loss = torch.mean(ratio * cost_advantage)
+            penalty = 0.0
+            if TrainingParameters.COST_COEF > 0.0:
+                penalty = F.softplus(self.lagrangian_param).item()
 
             # total loss
             all_loss = -policy_loss - entropy * TrainingParameters.ENTROPY_COEF + \
                 TrainingParameters.VALUE_COEF * critic_loss  \
                 + TrainingParameters.VALID_COEF * valid_loss \
-                + penalty * cost_loss
+                + TrainingParameters.COST_COEF * penalty * cost_loss
                 # + TrainingParameters.BLOCK_COEF * blocking_loss \ 
                 
             all_loss /= (1+penalty)
-            cost_deviation = (cur_cost - TrainingParameters.COST_LIMIT)
-            self.loss_penalty = -self.lagrangian_param * cost_deviation
 
         clip_frac = torch.mean(torch.greater(torch.abs(ratio - 1.0), TrainingParameters.CLIP_RANGE).float())
 
         self.net_scaler.scale(all_loss).backward()
         self.net_scaler.unscale_(self.net_optimizer)
 
+        cost_deviation = (episode_cost - TrainingParameters.COST_LIMIT)
+        loss_penalty = -self.lagrangian_param * cost_deviation
+
         self.lagrangian_optimizer.zero_grad()
-        self.loss_penalty.backward()
+        loss_penalty.backward()
         self.lagrangian_optimizer.step()
 
         # Clip gradient
@@ -204,7 +212,7 @@ class Model(object):
         input_state = (input_state_h, input_state_c)
 
         with autocast():
-            _, _,  _, _, _, logits = self.network(observation, vector, input_state)
+            _, _,  _, _, _, logits, _ = self.network(observation, vector, input_state)
             logits = torch.swapaxes(logits, 1, 2)
             imitation_loss = F.cross_entropy(logits, optimal_action)
 

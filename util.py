@@ -22,6 +22,9 @@ class BatchValues:
         self.hiddenState = list()
         self.returns = list()
         self.trainValid = list()
+        self.constraintRewards = list()
+        self.constraintValues = list()
+        self.constraintReturns = list()
 
 class OneEpPerformance():
     def __init__(self):
@@ -31,6 +34,7 @@ class OneEpPerformance():
         self.staticCollide = 0
         self.humanCollide = 0
         self.agentCollide = 0
+        self.episodeCostReward = 0
 
 def getFreeCell(world):
     size = world.shape

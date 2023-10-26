@@ -90,6 +90,7 @@ class SCRIMPNet(nn.Module):
         self.softmax_layer = nn.Softmax(dim=-1)
         self.sigmoid_layer = nn.Sigmoid()
         self.value_layer = nn.Linear(NetParameters.NET_SIZE, 1)
+        self.constraint_value_layer = nn.Linear(NetParameters.NET_SIZE, 1)
         self.blocking_layer = nn.Linear(NetParameters.NET_SIZE, 1)
         self.apply(weights_init)
 
@@ -146,5 +147,6 @@ class SCRIMPNet(nn.Module):
         policy = self.softmax_layer(policy_layer)
         policy_sig = self.sigmoid_layer(policy_layer)
         value = self.value_layer(x)
+        constraint_value = self.constraint_value_layer(x)
         blocking = F.sigmoid(self.blocking_layer(x))
-        return policy, value, blocking, policy_sig, x, policy_layer
+        return policy, value, blocking, policy_sig, x, policy_layer, constraint_value

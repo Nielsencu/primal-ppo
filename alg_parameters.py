@@ -19,6 +19,7 @@ class EnvParameters:
     HUMAN_COLLISION_COST = -2
     REPEAT_POS = -0.35
     BLOCKING_COST = 0
+    PENALTY_RADIUS = 5
     
     LIFELONG = True
 
@@ -34,6 +35,7 @@ class TrainingParameters:
     POLICY_COEF = 10
     VALID_COEF = 0.5
     BLOCK_COEF = 0.5
+    COST_COEF = 0.5
     COST_LIMIT = 25
     N_EPOCHS = 10
     N_ENVS = 1  # number of processes
