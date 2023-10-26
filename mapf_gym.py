@@ -458,9 +458,9 @@ class MapfGym():
             
         return rewards, shadowGoal
     
-    def calculateActionConstraintReward(self, actions, actionStatus):
+    def calculateConstraintReward(self):
         constraintRewards = np.zeros((1, EnvParameters.N_AGENTS), dtype=np.float32)
-        for i, _ in enumerate(actionStatus):
+        for i in range(EnvParameters.N_AGENTS):
             human_pos = self.human.getPos()
             robot_pos = self.agentList[i].getPos()
             reward = np.linalg.norm(human_pos - robot_pos) - EnvParameters.PENALTY_RADIUS

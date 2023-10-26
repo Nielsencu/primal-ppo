@@ -266,6 +266,10 @@ def evaluate(model, device, save_gif, curr_steps, greedy):
             
             oneEpisodePerformance.totalGoals+=np.sum(goalsReached)
 
+            constraintRewards = env.calculateConstraintReward()
+
+            oneEpisodePerformance.episodeCostReward += np.sum(constraintRewards)
+
             obs, vecs = env.getAllObservations() 
 
             if save_gif:
