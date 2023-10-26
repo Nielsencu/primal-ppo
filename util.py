@@ -35,6 +35,7 @@ class OneEpPerformance():
         self.humanCollide = 0
         self.agentCollide = 0
         self.episodeCostReward = 0
+        self.constraintViolations = 0
 
 def getFreeCell(world):
     size = world.shape

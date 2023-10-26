@@ -463,7 +463,7 @@ class MapfGym():
         for i in range(EnvParameters.N_AGENTS):
             human_pos = self.human.getPos()
             robot_pos = self.agentList[i].getPos()
-            reward = -min(np.linalg.norm(human_pos - robot_pos) - EnvParameters.PENALTY_RADIUS, 0)
+            reward = -min(np.linalg.norm(human_pos - robot_pos) - EnvParameters.PENALTY_RADIUS, 0.0)
             constraintRewards[:, i] = reward
         return constraintRewards
 

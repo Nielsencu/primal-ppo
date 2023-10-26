@@ -22,7 +22,6 @@ class Model(object):
             self.net_optimizer = optim.Adam(self.network.parameters(), lr=TrainingParameters.lr)
             self.lagrangian_param = torch.tensor(1.0, requires_grad=True).float()
             self.lagrangian_optimizer = optim.Adam([self.lagrangian_param], lr=TrainingParameters.LAGRANGIAN_LR)
-            # self.multi_gpu_net = torch.nn.DataParallel(self.network) # training on multiple GPU
             self.net_scaler = GradScaler()  # automatic mixed precision
 
     def step(self, observation = np.zeros(1), vector = np.zeros(1), input_state =  torch.zeros(1), num_agent = EnvParameters.N_AGENTS):
@@ -131,7 +130,7 @@ class Model(object):
                                                TrainingParameters.CLIP_RANGE)
             value_losses1 = torch.square(new_cv - constraint_returns)
             value_losses2= torch.square(new_cv_clipped - constraint_returns)
-            critic_loss += torch.mean(torch.maximum(value_losses1, value_losses2))
+            constraint_critic_loss = torch.mean(torch.maximum(value_losses1, value_losses2))
 
             # actor loss
             ratio = torch.squeeze(ratio)
@@ -158,7 +157,8 @@ class Model(object):
             all_loss = -policy_loss - entropy * TrainingParameters.ENTROPY_COEF + \
                 TrainingParameters.VALUE_COEF * critic_loss  \
                 + TrainingParameters.VALID_COEF * valid_loss \
-                + TrainingParameters.COST_COEF * penalty * cost_loss
+                + TrainingParameters.VALUE_COEF * constraint_critic_loss \
+                + TrainingParameters.COST_COEF * penalty * cost_loss \
                 # + TrainingParameters.BLOCK_COEF * blocking_loss \ 
                 
             all_loss /= (1+penalty)
@@ -174,7 +174,7 @@ class Model(object):
         self.lagrangian_optimizer.zero_grad()
         loss_penalty.backward()
         self.lagrangian_optimizer.step()
-        print("Lagrangian param is now ", self.lagrangian_param.item())
+        print("Lagrangian param", self.lagrangian_param.item())
 
         # Clip gradient
         grad_norm = torch.nn.utils.clip_grad_norm_(self.network.parameters(), TrainingParameters.MAX_GRAD_NORM)
@@ -186,6 +186,8 @@ class Model(object):
                       entropy.cpu().detach().numpy(),
                       critic_loss.cpu().detach().numpy(),
                       valid_loss.cpu().detach().numpy(),
+                      constraint_critic_loss.cpu().detach().numpy(),
+                      cost_loss.cpu().detach().numpy(),
                     #   blocking_loss.cpu().detach().numpy(),
                       clip_frac.cpu().detach().numpy(), grad_norm.cpu().detach().numpy(),
                       torch.mean(advantage).cpu().detach().numpy()]  # for recording
