@@ -157,7 +157,7 @@ class Model(object):
             all_loss = -policy_loss - entropy * TrainingParameters.ENTROPY_COEF + \
                 TrainingParameters.VALUE_COEF * critic_loss  \
                 + TrainingParameters.VALID_COEF * valid_loss \
-                + TrainingParameters.VALUE_COEF * constraint_critic_loss \
+                + TrainingParameters.COST_VALUE_COEF * constraint_critic_loss \
                 + TrainingParameters.COST_COEF * penalty * cost_loss \
                 # + TrainingParameters.BLOCK_COEF * blocking_loss \ 
                 

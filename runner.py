@@ -99,7 +99,7 @@ class Runner(object):
 
                 ##------------------------------------------------------------------------------------------------##
 
-                constraintRewards = env.calculateConstraintReward()
+                constraintRewards = env.calculateConstraintReward(actions)
 
                 oneEpisodePerformance.episodeCostReward += np.sum(constraintRewards)
                 oneEpisodePerformance.constraintViolations += np.count_nonzero(constraintRewards)

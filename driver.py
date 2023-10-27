@@ -266,7 +266,7 @@ def evaluate(model, device, save_gif, curr_steps, greedy):
             
             oneEpisodePerformance.totalGoals+=np.sum(goalsReached)
 
-            constraintRewards = env.calculateConstraintReward()
+            constraintRewards = env.calculateConstraintReward(actions)
 
             oneEpisodePerformance.episodeCostReward += np.sum(constraintRewards)
             oneEpisodePerformance.constraintViolations += np.count_nonzero(constraintRewards)
