@@ -464,12 +464,12 @@ class MapfGym():
         """
         return max(EnvParameters.PENALTY_RADIUS - np.linalg.norm(human_pos - robot_pos), 0.0) / EnvParameters.PENALTY_RADIUS
         
-    def calculateConstraintReward(self, actions):
-        constraintRewards = np.zeros((1, EnvParameters.N_AGENTS), dtype=np.float32)
+    def calculateCostReward(self, actions):
+        costRewards = np.zeros((1, EnvParameters.N_AGENTS), dtype=np.float32)
         for i in range(EnvParameters.N_AGENTS):
             self.agentList[i].emulateStep(actions[i])
-            constraintRewards[:, i] = self.calculateRadialConstraintCost(self.human.getNextPos(), self.agentList[i].getEmulatedStep())
-        return constraintRewards
+            costRewards[:, i] = self.calculateRadialConstraintCost(self.human.getNextPos(), self.agentList[i].getEmulatedStep())
+        return costRewards
 
     def getTrainValid(self, actions):
         trainValid = np.zeros((EnvParameters.N_AGENTS, EnvParameters.N_ACTIONS), dtype=np.float32)
