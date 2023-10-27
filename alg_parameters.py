@@ -20,6 +20,7 @@ class EnvParameters:
     REPEAT_POS = -0.35
     BLOCKING_COST = 0
     PENALTY_RADIUS = 5
+    CONSTRAINT_VIOLATION_COST = -1.0
     
     LIFELONG = True
 
@@ -35,7 +36,8 @@ class TrainingParameters:
     POLICY_COEF = 10
     VALID_COEF = 0.5
     BLOCK_COEF = 0.5
-    COST_COEF = 0.5
+    COST_VALUE_COEF = 0.0
+    COST_COEF = 0.0
     COST_LIMIT = 25
     N_EPOCHS = 10
     N_ENVS = 1  # number of processes
@@ -57,17 +59,15 @@ class SetupParameters:
     USE_GPU_LOCAL = False
     USE_GPU_GLOBAL = True
     NUM_GPU = 1
-
-
 class RecordingParameters:
     RETRAIN = False
     WANDB = True
     TENSORBOARD = False
     TXT_WRITER = True
-    ENTITY = 'td0013'
+    ENTITY = 'nielsencugito'
     TIME = datetime.datetime.now().strftime('%d-%m-%y%H%M')
     EXPERIMENT_PROJECT = 'HumanAware'
-    EXPERIMENT_NAME = 'Warehouse World'
+    EXPERIMENT_NAME = 'Warehouse-World_test'
     EXPERIMENT_NOTE = 'Handled Swapping coll with Humans'
     SAVE_INTERVAL = 5e5  # interval of saving model0
     BEST_INTERVAL = 0  # interval of saving model0 with the best performance
@@ -76,11 +76,11 @@ class RecordingParameters:
     EVAL_EPISODES = 1  # number of episode used in evaluation
     RECORD_BEST = False
     MODEL_PATH = './models' + '/' + EXPERIMENT_PROJECT + '/' + EXPERIMENT_NAME + TIME
-    GIFS_PATH = './gifs' + '/' + EXPERIMENT_PROJECT + '/' + EXPERIMENT_NAME + TIME
+    GIFS_PATH = 'C:/Users/niels/Downloads/gifs' + '/' + EXPERIMENT_PROJECT + '/' + EXPERIMENT_NAME + TIME
     SUMMARY_PATH = './summaries' + '/' + EXPERIMENT_PROJECT + '/' + EXPERIMENT_NAME + TIME
     TXT_NAME = 'alg.txt'
     LOSS_NAME = ['all_loss', 'policy_loss', 'policy_entropy', 'critic_loss', 'valid_loss',
-                 'blocking_loss', 'clipfrac',
+                 'cost_critic_loss', 'cost_loss', 'clipfrac',
                  'grad_norm', 'advantage']
 
 

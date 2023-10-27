@@ -454,7 +454,7 @@ class MapfGym():
             else:
                 raise Exception("How did this even happen")
             self.agentList[i].emulateStep(actions[i])
-            rewards[:, i] -= self.calculateRadialConstraintCost(self.human.getNextPos(), self.agentList[i].getEmulatedStep()) * EnvParameters.CONSTRAINT_VIOLATION_COST    
+            rewards[:, i] += self.calculateRadialConstraintCost(self.human.getNextPos(), self.agentList[i].getEmulatedStep()) * EnvParameters.CONSTRAINT_VIOLATION_COST    
         return rewards, shadowGoal
     
     def calculateRadialConstraintCost(self, human_pos, robot_pos):
