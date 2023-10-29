@@ -128,9 +128,9 @@ class Model(object):
             new_cv = torch.squeeze(new_cv)
             new_cv_clipped = old_cv+ torch.clamp(new_cv - old_cv, - TrainingParameters.CLIP_RANGE,
                                                TrainingParameters.CLIP_RANGE)
-            value_losses1 = torch.square(new_cv - cost_returns)
-            value_losses2= torch.square(new_cv_clipped - cost_returns)
-            cost_critic_loss = torch.mean(torch.maximum(value_losses1, value_losses2))
+            cost_value_losses1 = torch.square(new_cv - cost_returns)
+            cost_value_losses2= torch.square(new_cv_clipped - cost_returns)
+            cost_critic_loss = torch.mean(torch.maximum(cost_value_losses1, cost_value_losses2))
 
             # actor loss
             ratio = torch.squeeze(ratio)
@@ -169,7 +169,7 @@ class Model(object):
         self.net_scaler.unscale_(self.net_optimizer)
 
         cost_deviation = (episode_cost - TrainingParameters.COST_LIMIT)
-        loss_penalty = -self.lagrangian_param * cost_deviation
+        loss_penalty = self.lagrangian_param * cost_deviation
 
         self.lagrangian_optimizer.zero_grad()
         loss_penalty.backward()
