@@ -149,41 +149,47 @@ class Model(object):
 
             # penalty loss
             cost_loss = torch.mean(ratio * cost_advantage)
-            penalty = self.lagrangian_param
-            # if TrainingParameters.COST_COEF > 0.0:
-            #     penalty = F.softplus(self.lagrangian_param).item()
-
+            penalty = F.softplus(self.lagrangian_param)
+            penalty_item = penalty.item()
+                
             # total loss
             all_loss = -policy_loss - entropy * TrainingParameters.ENTROPY_COEF + \
                 TrainingParameters.VALUE_COEF * critic_loss  \
                 + TrainingParameters.VALID_COEF * valid_loss \
-                # + TrainingParameters.COST_VALUE_COEF * cost_critic_loss \
-                # + TrainingParameters.COST_COEF * penalty * cost_loss \
+                + TrainingParameters.COST_VALUE_COEF * cost_critic_loss \
+                + TrainingParameters.COST_COEF * penalty_item * cost_loss \
                 # + TrainingParameters.BLOCK_COEF * blocking_loss \ 
             
-            print('--------------')
-            print(policy_loss.item())
-            print(critic_loss.item())
-            print(valid_loss.item())
-            print(cost_loss.item())
-            print(cost_critic_loss.item())
-            print('--------------')
+            # print('--------------')
+            # print('pol loss ', policy_loss.item())
+            # print('critic loss ', critic_loss.item())
+            # print('valid loss ', valid_loss.item())
+            # print('cost loss ', cost_loss.item())
+            # print('cost critic loss ', cost_critic_loss.item())
+            # print('--------------')
             
-            # all_loss /= (1+penalty)
+            # all_loss /= (1+penalty_item)
 
         clip_frac = torch.mean(torch.greater(torch.abs(ratio - 1.0), TrainingParameters.CLIP_RANGE).float())
 
         self.net_scaler.scale(all_loss).backward()
         self.net_scaler.unscale_(self.net_optimizer)
 
-        cost_deviation = (episode_cost - TrainingParameters.COST_LIMIT)
-        loss_penalty = self.lagrangian_param * cost_deviation
+        cost_deviation = ( (episode_cost / EnvParameters.N_AGENTS) - TrainingParameters.COST_LIMIT_PER_AGENT)
+        loss_penalty = -self.lagrangian_param * cost_deviation
 
+        print('-'*10)
+        print("Cost deviation is ", cost_deviation)
+        print("Lagran param before opt ", self.lagrangian_param.item()) 
         self.lagrangian_optimizer.zero_grad()
         loss_penalty.backward()
         self.lagrangian_optimizer.step()
-        print("Lagrangian param", self.lagrangian_param.item())
-
+        self.lagrangian_param.data.clamp_(
+            0.0,
+            None,
+        )  # enforce: lambda in [0, inf]
+        
+        print("Lagrangian param after opt ", self.lagrangian_param.item())
         # Clip gradient
         grad_norm = torch.nn.utils.clip_grad_norm_(self.network.parameters(), TrainingParameters.MAX_GRAD_NORM)
 
@@ -198,7 +204,9 @@ class Model(object):
                       cost_loss.cpu().detach().numpy(),
                     #   blocking_loss.cpu().detach().numpy(),
                       clip_frac.cpu().detach().numpy(), grad_norm.cpu().detach().numpy(),
-                      torch.mean(advantage).cpu().detach().numpy()]  # for recording
+                      torch.mean(advantage).cpu().detach().numpy(),
+                      torch.mean(cost_advantage).cpu().detach().numpy(),
+                      self.lagrangian_param.item()]  # for recording
 
         return stats_list
 

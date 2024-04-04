@@ -36,11 +36,11 @@ class TrainingParameters:
     POLICY_COEF = 10
     VALID_COEF = 0.5
     BLOCK_COEF = 0.5
-    COST_VALUE_COEF = 0.0
-    COST_COEF = 0.0
-    COST_LIMIT = 25
+    COST_VALUE_COEF = 0.02
+    COST_COEF = 0.1
+    COST_LIMIT_PER_AGENT = 25
     N_EPOCHS = 10
-    N_ENVS = 1  # number of processes
+    N_ENVS = 16  # number of processes
     N_MAX_STEPS = 3e7  # maximum number of time steps used in training
     N_STEPS = 2 ** 8  # number of time steps per process per data collection
     MINIBATCH_SIZE = int(2 ** 8)
@@ -67,7 +67,7 @@ class RecordingParameters:
     ENTITY = 'nielsencugito'
     TIME = datetime.datetime.now().strftime('%d-%m-%y%H%M')
     EXPERIMENT_PROJECT = 'HumanAware'
-    EXPERIMENT_NAME = 'Warehouse-World_test'
+    EXPERIMENT_NAME = 'CVC-0.5,CC-0.1-UnnormalizedCost'
     EXPERIMENT_NOTE = 'Handled Swapping coll with Humans'
     SAVE_INTERVAL = 5e5  # interval of saving model0
     BEST_INTERVAL = 0  # interval of saving model0 with the best performance
@@ -81,7 +81,7 @@ class RecordingParameters:
     TXT_NAME = 'alg.txt'
     LOSS_NAME = ['all_loss', 'policy_loss', 'policy_entropy', 'critic_loss', 'valid_loss',
                  'cost_critic_loss', 'cost_loss', 'clipfrac',
-                 'grad_norm', 'advantage']
+                 'grad_norm', 'advantage', 'cost_advantage', 'lagrangian']
 
 
 all_args = {'N_AGENTS': EnvParameters.N_AGENTS, 'N_ACTIONS': EnvParameters.N_ACTIONS,
