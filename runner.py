@@ -49,7 +49,7 @@ class Runner(object):
 
                 ##------------------------------------------------------------------------------------------------##
                 
-                actions, ps, values, _, _, constraintValues = \
+                actions, ps, values, _, _, costValues = \
                     self.local_model.step(observation=obs, vector=vecs, input_state=hidden_state)
                 
                 ##------------------------------------------------------------------------------------------------##
@@ -57,7 +57,7 @@ class Runner(object):
                 mb.actions.append(actions)
                 mb.values.append(values)
                 mb.ps.append(ps)
-                mb.constraintValues.append(constraintValues)
+                mb.costValues.append(costValues)
 
                 ##------------------------------------------------------------------------------------------------##
                 
@@ -99,21 +99,21 @@ class Runner(object):
 
                 ##------------------------------------------------------------------------------------------------##
 
-                constraintRewards = env.calculateConstraintReward()
+                costRewards = env.calculateCostReward(actions)
 
-                oneEpisodePerformance.episodeCostReward += np.sum(constraintRewards)
-                oneEpisodePerformance.constraintViolations += np.count_nonzero(constraintRewards)
+                oneEpisodePerformance.episodeCostReward += np.sum(costRewards)
+                oneEpisodePerformance.constraintViolations += np.count_nonzero(costRewards)
 
-                mb.constraintRewards.append(constraintRewards)
+                mb.costRewards.append(costRewards)
 
                 ##------------------------------------------------------------------------------------------------##
 
             mb.observations = np.concatenate(mb.observations, axis=0)
             mb.vectors = np.concatenate(mb.vectors, axis=0)
             mb.rewards = np.concatenate(mb.rewards, axis=0)
-            mb.constraintRewards = np.concatenate(mb.constraintRewards, axis=0)
+            mb.costRewards = np.concatenate(mb.costRewards, axis=0)
             mb.values = np.squeeze(np.concatenate(mb.values, axis=0), axis=-1)
-            mb.constraintValues = np.squeeze(np.concatenate(mb.constraintValues, axis=0), axis=-1)
+            mb.costValues = np.squeeze(np.concatenate(mb.costValues, axis=0), axis=-1)
             mb.trainValid = np.stack(mb.trainValid)
             
 
@@ -121,7 +121,7 @@ class Runner(object):
             mb.ps = np.stack(mb.ps)
             mb.hiddenState = np.stack(mb.hiddenState)
 
-            last_values, last_constraint_values  = np.squeeze(
+            last_values, last_cost_values  = np.squeeze(
                 self.local_model.value(obs, vecs, hidden_state))
 
             # calculate advantages
@@ -129,15 +129,15 @@ class Runner(object):
             last_gaelam = 0
             next_nonterminal = 1.0
 
-            mb_constraint_advs = np.zeros_like(mb.rewards)
-            last_constraint_gaelam = 0
+            mb_cost_advs = np.zeros_like(mb.costRewards)
+            last_cost_gaelam = 0
             for t in reversed(range(TrainingParameters.N_STEPS)):
                 if t == TrainingParameters.N_STEPS - 1:
                     next_values = last_values
-                    next_constraint_values = last_constraint_values
+                    next_cost_values = last_cost_values
                 else:
                     next_values= mb.values[t + 1]
-                    next_constraint_values = mb.constraintValues[t+1]
+                    next_cost_values = mb.costValues[t+1]
 
                 delta = np.subtract(np.add(mb.rewards[t], TrainingParameters.GAMMA * next_nonterminal *
                                               next_values), mb.values[t])
@@ -146,13 +146,13 @@ class Runner(object):
                                                         TrainingParameters.GAMMA * TrainingParameters.LAM
                                                         * next_nonterminal * last_gaelam)
                 
-                constraint_delta = np.subtract(np.add(mb.constraintRewards[t], TrainingParameters.GAMMA * next_nonterminal *
-                                        next_constraint_values), mb.constraintValues[t])
+                cost_delta = np.subtract(np.add(mb.costRewards[t], TrainingParameters.GAMMA * next_nonterminal *
+                                        next_cost_values), mb.costValues[t])
                 
-                mb_constraint_advs[t] = last_constraint_gaelam = np.add(constraint_delta, TrainingParameters.GAMMA * TrainingParameters.LAM
-                                        * next_nonterminal * last_constraint_gaelam)
+                mb_cost_advs[t] = last_cost_gaelam = np.add(cost_delta, TrainingParameters.GAMMA * TrainingParameters.LAM
+                                        * next_nonterminal * last_cost_gaelam)
 
             mb.returns = np.add(mb_advs, mb.values)
-            mb.constraintReturns = np.add(mb_constraint_advs, mb.constraintValues)
+            mb.costReturns = np.add(mb_cost_advs, mb.costValues)
 
         return mb, oneEpisodePerformance

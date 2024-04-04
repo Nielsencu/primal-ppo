@@ -448,24 +448,28 @@ class MapfGym():
                 if(np.array_equal(self.agentList[i].getEmulatedStep(), self.agentList[i].getGoal())):
                     # rewards[:, i] = EnvParameters.GOAL_REWARD
                     rewards[:, i]=EnvParameters.ACTION_COST
-
                     shadowGoal+=1
                 else:
                     rewards[:, i]=EnvParameters.ACTION_COST
-                
             else:
                 raise Exception("How did this even happen")
-            
+            # self.agentList[i].emulateStep(actions[i])
+            # rewards[:, i] += self.calculateRadialConstraintCost(self.human.getNextPos(), self.agentList[i].getEmulatedStep()) * EnvParameters.CONSTRAINT_VIOLATION_COST    
         return rewards, shadowGoal
     
-    def calculateConstraintReward(self):
-        constraintRewards = np.zeros((1, EnvParameters.N_AGENTS), dtype=np.float32)
+    def calculateRadialConstraintCost(self, human_pos, robot_pos):
+        """
+        Returns the cost of the radial constraint between human and agent with the given id normalized to [0,1].
+        0 denotes safe distance, 1 denotes collision.
+        """
+        return max(EnvParameters.PENALTY_RADIUS - np.linalg.norm(human_pos - robot_pos), 0.0) / EnvParameters.PENALTY_RADIUS
+        
+    def calculateCostReward(self, actions):
+        costRewards = np.zeros((1, EnvParameters.N_AGENTS), dtype=np.float32)
         for i in range(EnvParameters.N_AGENTS):
-            human_pos = self.human.getPos()
-            robot_pos = self.agentList[i].getPos()
-            reward = -min(np.linalg.norm(human_pos - robot_pos) - EnvParameters.PENALTY_RADIUS, 0.0)
-            constraintRewards[:, i] = reward
-        return constraintRewards
+            self.agentList[i].emulateStep(actions[i])
+            costRewards[:, i] = self.calculateRadialConstraintCost(self.human.getNextPos(), self.agentList[i].getEmulatedStep())
+        return costRewards
 
     def getTrainValid(self, actions):
         trainValid = np.zeros((EnvParameters.N_AGENTS, EnvParameters.N_ACTIONS), dtype=np.float32)

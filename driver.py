@@ -129,7 +129,7 @@ def main():
                     end = start + TrainingParameters.MINIBATCH_SIZE
                     mb_inds = inds[start:end]
                     mb_loss.append(global_model.train(mb.observations[mb_inds], mb.vectors[mb_inds], mb.returns[mb_inds], \
-                                                    mb.constraintReturns[mb_inds], mb.values[mb_inds], mb.constraintValues[mb_inds], \
+                                                    mb.costReturns[mb_inds], mb.values[mb_inds], mb.costValues[mb_inds], \
                                                     mb.actions[mb_inds], mb.ps[mb_inds], \
                                                     mb.hiddenState[mb_inds], mb.trainValid[mb_inds], performance.episodeCostReward))
 
@@ -266,10 +266,10 @@ def evaluate(model, device, save_gif, curr_steps, greedy):
             
             oneEpisodePerformance.totalGoals+=np.sum(goalsReached)
 
-            constraintRewards = env.calculateConstraintReward()
+            costRewards = env.calculateCostReward(actions)
 
-            oneEpisodePerformance.episodeCostReward += np.sum(constraintRewards)
-            oneEpisodePerformance.constraintViolations += np.count_nonzero(constraintRewards)
+            oneEpisodePerformance.episodeCostReward += np.sum(costRewards)
+            oneEpisodePerformance.constraintViolations += np.count_nonzero(costRewards)
 
             obs, vecs = env.getAllObservations() 
 

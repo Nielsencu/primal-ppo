@@ -76,7 +76,7 @@ class Model(object):
         _, _, _, _, output_state, _, _ = self.network(obs, vector, input_state)
         return output_state
 
-    def train(self, observation, vector, returns, constraint_returns, old_v, old_cv, action,
+    def train(self, observation, vector, returns, cost_returns, old_v, old_cv, action,
               old_ps, input_state, train_valid, episode_cost):
         """train model0 by reinforcement learning"""
         self.net_optimizer.zero_grad()
@@ -95,7 +95,7 @@ class Model(object):
         train_valid = torch.from_numpy(train_valid).to(self.device)
         # target_blockings = torch.from_numpy(target_blockings).to(self.device)
 
-        constraint_returns = torch.from_numpy(constraint_returns).to(self.device)
+        cost_returns = torch.from_numpy(cost_returns).to(self.device)
         old_cv = torch.from_numpy(old_cv).to(self.device)
 
         input_state_h = torch.from_numpy(
@@ -108,7 +108,7 @@ class Model(object):
         advantage = normalize_advantage(returns - old_v)
 
         #dp_network = nn.DataParallel(self.network)
-        cost_advantage = normalize_advantage(constraint_returns - old_cv)
+        cost_advantage = normalize_advantage(cost_returns - old_cv)
         with autocast():
             new_ps, new_v, block, policy_sig, _, _, new_cv = self.network(observation, vector, input_state)
             new_p = new_ps.gather(-1, action)
@@ -128,9 +128,9 @@ class Model(object):
             new_cv = torch.squeeze(new_cv)
             new_cv_clipped = old_cv+ torch.clamp(new_cv - old_cv, - TrainingParameters.CLIP_RANGE,
                                                TrainingParameters.CLIP_RANGE)
-            value_losses1 = torch.square(new_cv - constraint_returns)
-            value_losses2= torch.square(new_cv_clipped - constraint_returns)
-            constraint_critic_loss = torch.mean(torch.maximum(value_losses1, value_losses2))
+            cost_value_losses1 = torch.square(new_cv - cost_returns)
+            cost_value_losses2= torch.square(new_cv_clipped - cost_returns)
+            cost_critic_loss = torch.mean(torch.maximum(cost_value_losses1, cost_value_losses2))
 
             # actor loss
             ratio = torch.squeeze(ratio)
@@ -149,19 +149,27 @@ class Model(object):
 
             # penalty loss
             cost_loss = torch.mean(ratio * cost_advantage)
-            penalty = 0.0
-            if TrainingParameters.COST_COEF > 0.0:
-                penalty = F.softplus(self.lagrangian_param).item()
+            penalty = self.lagrangian_param
+            # if TrainingParameters.COST_COEF > 0.0:
+            #     penalty = F.softplus(self.lagrangian_param).item()
 
             # total loss
             all_loss = -policy_loss - entropy * TrainingParameters.ENTROPY_COEF + \
                 TrainingParameters.VALUE_COEF * critic_loss  \
                 + TrainingParameters.VALID_COEF * valid_loss \
-                + TrainingParameters.VALUE_COEF * constraint_critic_loss \
-                + TrainingParameters.COST_COEF * penalty * cost_loss \
+                # + TrainingParameters.COST_VALUE_COEF * cost_critic_loss \
+                # + TrainingParameters.COST_COEF * penalty * cost_loss \
                 # + TrainingParameters.BLOCK_COEF * blocking_loss \ 
-                
-            all_loss /= (1+penalty)
+            
+            print('--------------')
+            print(policy_loss.item())
+            print(critic_loss.item())
+            print(valid_loss.item())
+            print(cost_loss.item())
+            print(cost_critic_loss.item())
+            print('--------------')
+            
+            # all_loss /= (1+penalty)
 
         clip_frac = torch.mean(torch.greater(torch.abs(ratio - 1.0), TrainingParameters.CLIP_RANGE).float())
 
@@ -169,7 +177,7 @@ class Model(object):
         self.net_scaler.unscale_(self.net_optimizer)
 
         cost_deviation = (episode_cost - TrainingParameters.COST_LIMIT)
-        loss_penalty = -self.lagrangian_param * cost_deviation
+        loss_penalty = self.lagrangian_param * cost_deviation
 
         self.lagrangian_optimizer.zero_grad()
         loss_penalty.backward()
@@ -186,7 +194,7 @@ class Model(object):
                       entropy.cpu().detach().numpy(),
                       critic_loss.cpu().detach().numpy(),
                       valid_loss.cpu().detach().numpy(),
-                      constraint_critic_loss.cpu().detach().numpy(),
+                      cost_critic_loss.cpu().detach().numpy(),
                       cost_loss.cpu().detach().numpy(),
                     #   blocking_loss.cpu().detach().numpy(),
                       clip_frac.cpu().detach().numpy(), grad_norm.cpu().detach().numpy(),

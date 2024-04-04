@@ -22,9 +22,9 @@ class BatchValues:
         self.hiddenState = list()
         self.returns = list()
         self.trainValid = list()
-        self.constraintRewards = list()
-        self.constraintValues = list()
-        self.constraintReturns = list()
+        self.costRewards = list()
+        self.costValues = list()
+        self.costReturns = list()
 
 class OneEpPerformance():
     def __init__(self):
