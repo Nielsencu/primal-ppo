@@ -216,6 +216,7 @@ class MapfGym():
         # 2: own goal
         # 3: agents' in Fov goals
         # 4: human in Fov
+        # 5: dangerous area
         
         world = self.worldWithAgents()
         size = world.shape
@@ -240,8 +241,11 @@ class MapfGym():
                 elif world[i,j]>0:
                     # other agents in FOV (in agent Map)
                     visibleAgents.append(world[i,j])
-                    observations[1,i - top_left[0], j - top_left[1]] = 1 
+                    observations[1,i - top_left[0], j - top_left[1]] = 1
 
+                human_next_pos = self.human.getNextPos()
+                if np.linalg.norm(np.array(human_next_pos) - np.array([i,j])) <= EnvParameters.PENALTY_RADIUS:
+                    observations[5, i - top_left[0], j - top_left[1]] = 1
         if(top_left[0]<= agent.getGoal()[0]<top_left[0] + EnvParameters.FOV_SIZE and top_left[1]<= agent.getGoal()[1]<top_left[1] + EnvParameters.FOV_SIZE):
             # own goal in FOV (in own goal frame)
             observations[2,agent.getGoal()[0] - top_left[0], agent.getGoal()[1] - top_left[1]] = 1
@@ -462,6 +466,7 @@ class MapfGym():
         Returns the cost of the radial constraint between human and agent
         Cost 0 means safe
         """
+        
         return max(EnvParameters.PENALTY_RADIUS - np.linalg.norm(human_pos - robot_pos), 0.0)
 
     def calculateRadialConstraintCostNormalized(self, human_pos, robot_pos):
