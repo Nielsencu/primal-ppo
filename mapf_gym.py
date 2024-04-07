@@ -243,9 +243,15 @@ class MapfGym():
                     visibleAgents.append(world[i,j])
                     observations[1,i - top_left[0], j - top_left[1]] = 1
 
-                human_next_pos = self.human.getNextPos()
-                if np.linalg.norm(np.array(human_next_pos) - np.array([i,j])) <= EnvParameters.PENALTY_RADIUS:
+                human_next_pos = np.array(self.human.getNextPos())
+                if TrainingParameters.USE_INFLATED_HUMAN and np.linalg.norm(human_next_pos - np.array([i,j])) <= EnvParameters.PENALTY_RADIUS:
                     observations[4, i - top_left[0], j - top_left[1]] = 1
+                    
+                if TrainingParameters.USE_HUMAN_TRAJECTORY_PREDICTION:
+                    human_astar_path = self.human.path[1:TrainingParameters.K_TIMESTEP_PREDICT+1]
+                    for astar_pt in human_astar_path:
+                        if np.linalg.norm(np.array(astar_pt) - np.array([i,j])) <= 0.01:
+                            observations[5, i - top_left[0], j - top_left[1]] = 1
         if(top_left[0]<= agent.getGoal()[0]<top_left[0] + EnvParameters.FOV_SIZE and top_left[1]<= agent.getGoal()[1]<top_left[1] + EnvParameters.FOV_SIZE):
             # own goal in FOV (in own goal frame)
             observations[2,agent.getGoal()[0] - top_left[0], agent.getGoal()[1] - top_left[1]] = 1
@@ -564,6 +570,7 @@ class MapfGym():
 
     def jointStep(self, actions, actionStatus):
         goalsReached = np.zeros(EnvParameters.N_AGENTS)
+        constraintsViolated = np.zeros(EnvParameters.N_AGENTS)
         if not np.all((actionStatus>0) | (actionStatus<=-4)):
             actions = self.fixActions(actions, actionStatus)
 
@@ -576,12 +583,15 @@ class MapfGym():
                     agent.setGoal(getFreeCell(self.worldWithAgentsAndGoals()))
                     self.makeBfsMap(agent)
 
-
         self.human.nextStep()
+        
+        humanPos = self.human.getPos()
+        for agentIdx, agent in enumerate(self.agentList):
+            constraintsViolated[agentIdx] += int(self.calculateRadialConstraintCost(humanPos, agent.getPos()) >= 0.01)
 
         self.allGoodActions = self.getUnconditionallyGoodActions(returnIsNeeded=True)
 
-        return goalsReached
+        return goalsReached, constraintsViolated
 
     def _render(self):
         goals = []

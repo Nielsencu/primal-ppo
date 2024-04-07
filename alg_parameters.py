@@ -46,11 +46,14 @@ class TrainingParameters:
     MINIBATCH_SIZE = int(2 ** 8)
     DEMONSTRATION_PROB = 0  # imitation learning rate
     LAGRANGIAN_LR = 5e-2
+    USE_INFLATED_HUMAN = True
+    USE_HUMAN_TRAJECTORY_PREDICTION = True
+    K_TIMESTEP_PREDICT = 5
 
 
 class NetParameters:
     NET_SIZE = 512
-    NUM_CHANNEL = 5  # number of channels of observations -[FOV_SIZE x FOV_SIZEx NUM_CHANNEL]
+    NUM_CHANNEL = 5 + int(TrainingParameters.USE_HUMAN_TRAJECTORY_PREDICTION)  # number of channels of observations -[FOV_SIZE x FOV_SIZEx NUM_CHANNEL]
     GOAL_REPR_SIZE = 12
     VECTOR_LEN = 4  # [dx, dy, d total, action t-1]
 
