@@ -76,7 +76,7 @@ class Runner(object):
                 rewards, shadowGoals = env.calculateActionReward(actions, actionStatus)
 
                 oneEpisodePerformance.shadowGoals+=shadowGoals
-
+                costRewards = env.calculateCostReward(actions)
                 ##------------------------------------------------------------------------------------------------##
 
                 trainVal = env.getTrainValid(actions)
@@ -84,27 +84,20 @@ class Runner(object):
                 mb.trainValid.append(trainVal)
 
                 ##------------------------------------------------------------------------------------------------##
-                goalsReached = env.jointStep(actions, actionStatus)
+                goalsReached, constraintsViolated = env.jointStep(actions, actionStatus)
 
                 for i, value in enumerate(goalsReached):
                     if(value==1):
                         rewards[0,i]+=EnvParameters.GOAL_REWARD
 
                 mb.rewards.append(rewards)
+                mb.costRewards.append(costRewards)
 
                 oneEpisodePerformance.episodeReward += np.sum(rewards)
-
-                oneEpisodePerformance.totalGoals+=np.sum(goalsReached)
-                obs, vecs = env.getAllObservations() 
-
-                ##------------------------------------------------------------------------------------------------##
-
-                costRewards = env.calculateCostReward(actions)
-
                 oneEpisodePerformance.episodeCostReward += np.sum(costRewards)
-                oneEpisodePerformance.constraintViolations += np.count_nonzero(costRewards)
-
-                mb.costRewards.append(costRewards)
+                oneEpisodePerformance.totalGoals+=np.sum(goalsReached)
+                oneEpisodePerformance.constraintViolations += np.sum(constraintsViolated)
+                obs, vecs = env.getAllObservations() 
 
                 ##------------------------------------------------------------------------------------------------##
 
