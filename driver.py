@@ -252,10 +252,11 @@ def evaluate(model, device, save_gif, curr_steps, greedy):
 
 
             rewards,shadowGoals = env.calculateActionReward(actions, actionStatus)
+            costRewards = env.calculateCostReward(actions)
 
             oneEpisodePerformance.shadowGoals+=shadowGoals  
         
-            goalsReached = env.jointStep(actions, actionStatus)
+            goalsReached, constraintsViolated = env.jointStep(actions, actionStatus)
 
             for i, value in enumerate(goalsReached):
                 if(value==1):
@@ -266,10 +267,8 @@ def evaluate(model, device, save_gif, curr_steps, greedy):
             
             oneEpisodePerformance.totalGoals+=np.sum(goalsReached)
 
-            costRewards = env.calculateCostReward(actions)
-
             oneEpisodePerformance.episodeCostReward += np.sum(costRewards)
-            oneEpisodePerformance.constraintViolations += np.count_nonzero(costRewards)
+            oneEpisodePerformance.constraintViolations += np.sum(constraintsViolated)
 
             obs, vecs = env.getAllObservations() 
 
