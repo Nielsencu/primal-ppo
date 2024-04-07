@@ -245,7 +245,7 @@ class MapfGym():
 
                 human_next_pos = self.human.getNextPos()
                 if np.linalg.norm(np.array(human_next_pos) - np.array([i,j])) <= EnvParameters.PENALTY_RADIUS:
-                    observations[5, i - top_left[0], j - top_left[1]] = 1
+                    observations[4, i - top_left[0], j - top_left[1]] = 1
         if(top_left[0]<= agent.getGoal()[0]<top_left[0] + EnvParameters.FOV_SIZE and top_left[1]<= agent.getGoal()[1]<top_left[1] + EnvParameters.FOV_SIZE):
             # own goal in FOV (in own goal frame)
             observations[2,agent.getGoal()[0] - top_left[0], agent.getGoal()[1] - top_left[1]] = 1

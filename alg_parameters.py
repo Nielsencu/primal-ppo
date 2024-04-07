@@ -36,8 +36,8 @@ class TrainingParameters:
     POLICY_COEF = 10
     VALID_COEF = 0.5
     BLOCK_COEF = 0.5
-    COST_VALUE_COEF = 0.02
-    COST_COEF = 0.1
+    COST_VALUE_COEF = 0.0
+    COST_COEF = 0.0
     COST_LIMIT_PER_AGENT = 25
     N_EPOCHS = 10
     N_ENVS = 16  # number of processes
@@ -67,7 +67,7 @@ class RecordingParameters:
     ENTITY = 'nielsencugito'
     TIME = datetime.datetime.now().strftime('%d-%m-%y%H%M')
     EXPERIMENT_PROJECT = 'HumanAware'
-    EXPERIMENT_NAME = 'CVC-0.5,CC-0.1-UnnormalizedCost'
+    EXPERIMENT_NAME = 'Vanilla'
     EXPERIMENT_NOTE = 'Handled Swapping coll with Humans'
     SAVE_INTERVAL = 5e5  # interval of saving model0
     BEST_INTERVAL = 0  # interval of saving model0 with the best performance
