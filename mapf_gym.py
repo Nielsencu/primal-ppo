@@ -486,7 +486,7 @@ class MapfGym():
         costRewards = np.zeros((1, EnvParameters.N_AGENTS), dtype=np.float32)
         for i in range(EnvParameters.N_AGENTS):
             self.agentList[i].emulateStep(actions[i])
-            costRewards[:, i] = self.calculateRadialConstraintCost(self.human.getNextPos(), self.agentList[i].getEmulatedStep())
+            costRewards[:, i] = self.calculateRadialConstraintCostNormalized(self.human.getNextPos(), self.agentList[i].getEmulatedStep())
         return costRewards
 
     def getTrainValid(self, actions):
@@ -587,7 +587,7 @@ class MapfGym():
         
         humanPos = self.human.getPos()
         for agentIdx, agent in enumerate(self.agentList):
-            constraintsViolated[agentIdx] += int(self.calculateRadialConstraintCost(humanPos, agent.getPos()) >= 0.01)
+            constraintsViolated[agentIdx] += int(self.calculateRadialConstraintCostNormalized(humanPos, agent.getPos()) >= 0.01)
 
         self.allGoodActions = self.getUnconditionallyGoodActions(returnIsNeeded=True)
 
