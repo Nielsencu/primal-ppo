@@ -105,9 +105,13 @@ class Model(object):
 
         normalize_advantage = lambda x : (x-x.mean()) / (x.std() + 1e-6)
         advantage = normalize_advantage(returns - old_v)
+        cost_advantage = normalize_advantage(cost_returns - old_cv)
 
         #dp_network = nn.DataParallel(self.network)
-        cost_advantage = normalize_advantage(cost_returns - old_cv)
+        if TrainingParameters.MINUS_ADV_WITH_CADV:
+            advantage -= self.lagrange.get_lagrangian_param() * cost_advantage
+            advantage /= (self.lagrange.get_lagrangian_param() + 1)
+            
         with autocast():
             new_ps, new_v, block, policy_sig, _, _, new_cv = self.network(observation, vector, input_state)
             new_p = new_ps.gather(-1, action)

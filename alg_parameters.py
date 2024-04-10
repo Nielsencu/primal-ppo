@@ -36,24 +36,31 @@ class TrainingParameters:
     POLICY_COEF = 10
     VALID_COEF = 0.5
     BLOCK_COEF = 0.5
-    COST_VALUE_COEF = 0.0
-    COST_COEF = 0.0
-    COST_LIMIT_PER_AGENT = 25
     N_EPOCHS = 10
     N_ENVS = 16  # number of processes
     N_MAX_STEPS = 3e7  # maximum number of time steps used in training
     N_STEPS = 2 ** 8  # number of time steps per process per data collection
     MINIBATCH_SIZE = int(2 ** 8)
     DEMONSTRATION_PROB = 0  # imitation learning rate
+    
+    # Nielsen's Testing
+    COST_LIMIT_PER_AGENT = 5
+    COST_VALUE_COEF = 0.0
+    COST_COEF = 0.0
+    
     USE_INFLATED_HUMAN = True
     USE_HUMAN_TRAJECTORY_PREDICTION = True
     K_TIMESTEP_PREDICT = 5
+    
+    # CPPO-PID (Responsive Safety in Reinforcement Learning by PID Lagrangian Methods)
+    MINUS_ADV_WITH_CADV = True
+    
     
 class LagrangianParameters:
     LAGRANGIAN_TYPE = 0 # 0 for base Lagrangian, 1 for PID Lagrangian
     
     INIT_VALUE = 1.0
-    UPPER_BOUND = None
+    UPPER_BOUND = 20.0
     
     # Params for Base lagrangian
     LR = 5e-2
