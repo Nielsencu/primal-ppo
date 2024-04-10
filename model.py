@@ -8,7 +8,7 @@ from torch.cuda.amp.grad_scaler import GradScaler
 from alg_parameters import *
 from net import SCRIMPNet
 import torch.nn as nn
-
+import lagrange
 
 class Model(object):
     """model0 of agents"""
@@ -20,8 +20,7 @@ class Model(object):
         self.network = SCRIMPNet().to(device)  # neural network
         if global_model:
             self.net_optimizer = optim.Adam(self.network.parameters(), lr=TrainingParameters.lr)
-            self.lagrangian_param = torch.tensor(1.0, requires_grad=True).float()
-            self.lagrangian_optimizer = optim.Adam([self.lagrangian_param], lr=TrainingParameters.LAGRANGIAN_LR)
+            self.lagrange : lagrange.Lagrange = lagrange.Lagrangian(TrainingParameters.COST_LIMIT_PER_AGENT, 1.0, TrainingParameters.LAGRANGIAN_LR, None)
             self.net_scaler = GradScaler()  # automatic mixed precision
 
     def step(self, observation = np.zeros(1), vector = np.zeros(1), input_state =  torch.zeros(1), num_agent = EnvParameters.N_AGENTS):
@@ -149,8 +148,7 @@ class Model(object):
 
             # penalty loss
             cost_loss = torch.mean(ratio * cost_advantage)
-            penalty = F.softplus(self.lagrangian_param)
-            penalty_item = penalty.item()
+            penalty_item = self.lagrange.get_lagrangian_param()
                 
             # total loss
             all_loss = -policy_loss - entropy * TrainingParameters.ENTROPY_COEF + \
@@ -175,21 +173,7 @@ class Model(object):
         self.net_scaler.scale(all_loss).backward()
         self.net_scaler.unscale_(self.net_optimizer)
 
-        cost_deviation = ( (episode_cost / EnvParameters.N_AGENTS) - TrainingParameters.COST_LIMIT_PER_AGENT)
-        loss_penalty = -self.lagrangian_param * cost_deviation
-
-        print('-'*10)
-        print("Cost deviation is ", cost_deviation)
-        print("Lagran param before opt ", self.lagrangian_param.item()) 
-        self.lagrangian_optimizer.zero_grad()
-        loss_penalty.backward()
-        self.lagrangian_optimizer.step()
-        self.lagrangian_param.data.clamp_(
-            0.0,
-            None,
-        )  # enforce: lambda in [0, inf]
-        
-        print("Lagrangian param after opt ", self.lagrangian_param.item())
+        self.lagrange.update_lagrangian_multiplier(episode_cost)
         # Clip gradient
         grad_norm = torch.nn.utils.clip_grad_norm_(self.network.parameters(), TrainingParameters.MAX_GRAD_NORM)
 
@@ -206,7 +190,7 @@ class Model(object):
                       clip_frac.cpu().detach().numpy(), grad_norm.cpu().detach().numpy(),
                       torch.mean(advantage).cpu().detach().numpy(),
                       torch.mean(cost_advantage).cpu().detach().numpy(),
-                      self.lagrangian_param.item()]  # for recording
+                      self.lagrange.get_lagrangian_param()]  # for recording
 
         return stats_list
 
