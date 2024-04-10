@@ -173,7 +173,7 @@ class Model(object):
         self.net_scaler.scale(all_loss).backward()
         self.net_scaler.unscale_(self.net_optimizer)
 
-        self.lagrange.update_lagrangian_multiplier(episode_cost)
+        self.lagrange.update_lagrangian_multiplier(episode_cost / EnvParameters.N_AGENTS)
         # Clip gradient
         grad_norm = torch.nn.utils.clip_grad_norm_(self.network.parameters(), TrainingParameters.MAX_GRAD_NORM)
 
