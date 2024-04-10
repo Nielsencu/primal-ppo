@@ -20,7 +20,7 @@ class Model(object):
         self.network = SCRIMPNet().to(device)  # neural network
         if global_model:
             self.net_optimizer = optim.Adam(self.network.parameters(), lr=TrainingParameters.lr)
-            self.lagrange : lagrange.Lagrange = lagrange.Lagrangian(TrainingParameters.COST_LIMIT_PER_AGENT, 1.0, TrainingParameters.LAGRANGIAN_LR, None)
+            self.lagrange : lagrange.Lagrange = lagrange.get_lagrangian(LagrangianParameters.LAGRANGIAN_TYPE, TrainingParameters.COST_LIMIT_PER_AGENT)
             self.net_scaler = GradScaler()  # automatic mixed precision
 
     def step(self, observation = np.zeros(1), vector = np.zeros(1), input_state =  torch.zeros(1), num_agent = EnvParameters.N_AGENTS):

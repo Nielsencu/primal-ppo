@@ -45,11 +45,26 @@ class TrainingParameters:
     N_STEPS = 2 ** 8  # number of time steps per process per data collection
     MINIBATCH_SIZE = int(2 ** 8)
     DEMONSTRATION_PROB = 0  # imitation learning rate
-    LAGRANGIAN_LR = 5e-2
     USE_INFLATED_HUMAN = True
     USE_HUMAN_TRAJECTORY_PREDICTION = True
     K_TIMESTEP_PREDICT = 5
-
+    
+class LagrangianParameters:
+    LAGRANGIAN_TYPE = 0 # 0 for base Lagrangian, 1 for PID Lagrangian
+    
+    INIT_VALUE = 1.0
+    UPPER_BOUND = None
+    
+    # Params for Base lagrangian
+    LR = 5e-2
+    # Params for PID Lagrangian
+    KP = 0.1
+    KI = 0.01
+    KD = 0.01
+    
+    # Set moving avg alpha to 0 to transform to classic PID
+    COST_MOVING_AVG_ALPHA = 0.95
+    DELTA_MOVING_AVG__ALPHA = 0.95
 
 class NetParameters:
     NET_SIZE = 512
