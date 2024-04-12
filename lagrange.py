@@ -69,7 +69,7 @@ class PIDLagrangian:
     def get_lagrangian_param(self) -> float:
         return self.lagrangian_param
         
-    def update(self, ep_cost_avg : float) -> None:
+    def update_lagrangian_multiplier(self, ep_cost_avg : float) -> None:
         delta = ep_cost_avg - self.cost_limit
         
         alpha_delta = LagrangianParameters.DELTA_MOVING_AVG_ALPHA
@@ -81,8 +81,9 @@ class PIDLagrangian:
         self.cost_moving_avg += (1-alpha_cost) * ep_cost_avg
         
         d_term = max(0.0, self.cost_moving_avg - self.cost_moving_avg_prev) 
-        self.i_term = max(0.0, self.integral_sum + delta * LagrangianParameters.KI)
+        self.i_term = max(0.0, self.i_term + delta * LagrangianParameters.KI)
         
         pid_sum = LagrangianParameters.KP * self.delta_moving_avg + self.i_term + LagrangianParameters.KD * d_term
         self.lagrangian_param = max(0.0, pid_sum)
         self.cost_moving_avg_prev = self.cost_moving_avg
+        

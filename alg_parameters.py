@@ -74,7 +74,7 @@ class LagrangianParameters:
     
     # Set moving avg alpha to 0 to transform to classic PID
     COST_MOVING_AVG_ALPHA = 0.95
-    DELTA_MOVING_AVG__ALPHA = 0.95
+    DELTA_MOVING_AVG_ALPHA = 0.95
 
 class NetParameters:
     NET_SIZE = 512
