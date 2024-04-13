@@ -616,17 +616,17 @@ class MapfGym():
                             humanPath=self.human.path, humanStep=self.human.step)
         
 class FixedMapfGym(MapfGym):
-    def __init__(self, obstaclesMap : np.ndarray, agentGoalsList : list[Sequence], agentStartsList : list[tuple[int, int]], humanStart : tuple[int, int], humanGoal : tuple[int, int]):
+    def __init__(self, obstaclesMap : np.ndarray, agentsSequence : list[Sequence], humanStart : tuple[int, int], humanGoal : tuple[int, int]):
         self.agentList = [Agent() for _ in range(EnvParameters.N_AGENTS)]
         self.obstacleMap = copy.deepcopy(obstaclesMap)
         self.human : Human = LoopingHuman(world=self.obstacleMap, startPos=humanStart, goalPos=humanGoal)
-        self.goalsList : list[Sequence] = copy.deepcopy(agentGoalsList)
-        self.startsList : list[tuple[int, int]] = agentStartsList.copy()
+        self.agentsSequence : list[Sequence] = copy.deepcopy(agentsSequence)
         self.populateMap()
         self.allGoodActions = self.getUnconditionallyGoodActions(returnIsNeeded=True)
         
     def getAgentStart(self, worldMap: np.ndarray, agentId: int | None = None):
-        return self.startsList[agentId]
+        return self.agentsSequence[agentId].getNext()
+    
     def getNextGoal(self, worldMap: np.ndarray, agentId: int | None = None) -> tuple[int, int]:
-        return self.goalsList[agentId].getNext()
+        return self.agentsSequence[agentId].getNext()
         

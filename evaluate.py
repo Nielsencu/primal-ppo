@@ -59,51 +59,41 @@ def evaluate(model, device, greedy):
     fixedEpisodeInfos = []
     for i in range(EvalParameters.EPISODES):
         obstacleMap = generateWarehouse(num_block=EnvParameters.WORLD_SIZE)
-        humanStart = Human.getEntrance(obstacleMap)
-        humanGoal = getFreeCell(obstacleMap)
-        obstacleMap[returnAsType(humanStart,'mat')] = 1
-        # human_path = astar_4(obstacleMap, humanStart, humanGoal)[0]
+        tempMap = np.copy(obstacleMap)
+        humanStart = Human.getEntrance(tempMap)
+        humanGoal = getFreeCell(tempMap)
+        tempMap[returnAsType(humanStart,'mat')] = 1
+        # human_path = astar_4(tempMap, humanStart, humanGoal)[0]
         # human_path =  human_path[::-1]
-        agentStartsList = []
+        agentsSequence = [Sequence() for _ in range(EvalParameters.N_AGENTS)]
         # Generate the starting pos for agents while respecting other agents' spawning point
-        for agentIdx in range(len(EvalParameters.N_AGENTS)):
-            agentStart = np.array(getFreeCell(obstacleMap))
-            obstacleMap[agentStart] = 2
-            agentStartsList.append(agentStart)
+        for agentIdx in range(EvalParameters.N_AGENTS):
+            agentStart = getFreeCell(tempMap)
+            tempMap[agentStart] = 2
+            agentsSequence[agentIdx].add(tuple(agentStart))
         
         pathLengths = [0 for _ in range(EvalParameters.N_AGENTS)]
-        step = 0
-        agentGoalSequences = [Sequence() for _ in range(len(EvalParameters.N_AGENTS))]
         goalSequencesComplete = [False for _ in range(EvalParameters.N_AGENTS)]
         while not np.all(goalSequencesComplete):
-            for agentIdx in range(len(EvalParameters.N_AGENTS)):
+            for agentIdx in range(EvalParameters.N_AGENTS):
                 if goalSequencesComplete[agentIdx]:
                     continue
-                agentGoalSequence = agentGoalSequences[agentIdx]
-                if step == 0:
-                    agentStart = agentStartsList[agentIdx]
-                else:
-                    agentStart = agentGoalSequence.getAtPos(-1)
-                agentGoal = getFreeCell(obstacleMap)
-                obstacleMap[np.array(agentGoal)] = 3
+                agentSequence = agentsSequence[agentIdx]
+                agentStart = agentSequence.getAtPos(-1)
                 
-                agentGoalSequence.add(agentGoal)
+                agentGoal = getFreeCell(tempMap)
+                tempMap[agentGoal] = 3
                 
-                optimalAgentPath = astar_4(obstacleMap, agentStart, agentGoal)
-                pathLengths[agentIdx] += optimalAgentPath
+                agentSequence.add(agentGoal)
+                
+                optimalAgentPath = astar_4(tempMap, agentStart, agentGoal)[0]
+                pathLengths[agentIdx] += len(optimalAgentPath)-1
                 if pathLengths[agentIdx] > EvalParameters.MAX_STEPS:
                     goalSequencesComplete[agentIdx] = True
-            if step == 0:
-                # Free the starting point of all agents to generate consecutive goals
-                for agentStart in agentStartsList:
-                    obstacleMap[agentStart] = 0
-            else:
-                # Free the previous goal
-                for agentGoalSequence in agentGoalSequences:
-                    obstacleMap[np.array(agentGoalSequence.getAtPos(-2))] = 0
-            step +=1
-        agentStartsList = [tuple(agentStart) for agentStart in agentStartsList]
-        fixedEpisodeInfos.append((obstacleMap, agentStartsList, agentGoalSequences, humanStart, humanGoal))
+            # Free the previous previous position
+            for agentSequence in agentsSequence:
+                tempMap[agentSequence.getAtPos(-2)] = 0
+        fixedEpisodeInfos.append((obstacleMap, agentsSequence, humanStart, humanGoal))
     
     for model_name, net_path_checkpoint in EvalParameters.MODELS:
         net_dict = torch.load(net_path_checkpoint)
@@ -114,8 +104,11 @@ def evaluate(model, device, greedy):
             oneEpisodePerformance = OneEpPerformance()
             episode_frames = []
             
-            obstaclesMap, agentStartsList, agentGoalsList, humanStart, humanGoal = fixedEpisodeInfos[curr_episode]
-            env = FixedMapfGym(obstaclesMap, agentStartsList, agentGoalsList, humanStart, humanGoal)
+            obstaclesMap, agentsSequence, humanStart, humanGoal = fixedEpisodeInfos[curr_episode]
+            print(f"Episode {i}: HumStart {humanStart} HumGoal {humanGoal}")
+            for id, agentSequence in enumerate(agentsSequence):
+                print(f"Agent {id} seq : {agentSequence.items}")
+            env = FixedMapfGym(obstaclesMap, agentsSequence, humanStart, humanGoal)
             
             obs, vecs = env.getAllObservations()
 
