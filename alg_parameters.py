@@ -3,7 +3,8 @@ import datetime
 """ Hyperparameters """
 
 class EvalParameters:
-    FIXED_EVAL = True
+    EPISODES = 100
+    MODELS = [("PPOLag", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl")]
 
 class EnvParameters:
     N_AGENTS = 2  # number of agents used in training
@@ -24,7 +25,7 @@ class EnvParameters:
     PENALTY_RADIUS = 5
     CONSTRAINT_VIOLATION_COST = -1.0
     
-    LIFELONG = True
+    LIFELONG = False
 
 
 class TrainingParameters:
