@@ -1,20 +1,19 @@
 import os
-import os.path as osp
-
 import numpy as np
-import ray
 import setproctitle
 import torch
 import wandb
 from util import Sequence
 
-from alg_parameters import TrainingParameters, SetupParameters, RecordingParameters, EnvParameters, EvalParameters, all_args
+from alg_parameters import SetupParameters, RecordingParameters, EnvParameters, EvalParameters, all_args
 from mapf_gym import FixedMapfGym, MapfGym
 from model import Model
-from util import set_global_seeds, write_to_wandb, make_gif, OneEpPerformance, NetParameters
+from util import set_global_seeds, write_to_wandb, make_gif, OneEpPerformance, NetParameters, getFreeCell, returnAsType
+from map_generator import generateWarehouse
+from mapf_gym import Human
+from astar_4 import astar_4
 
 os.environ["CUDA_VISIBLE_DEVICES"] = '1'
-ray.init(num_gpus=SetupParameters.NUM_GPU)
 print("Welcome to MAPF!\n")
 
 def main():
@@ -41,12 +40,11 @@ def main():
     # Start evaluation
     try:
         # get data from multiple processes
-        save_gif = True
         # evaluate training model
         with torch.no_grad():
             # greedy_eval_performance_dict = evaluate(eval_env,eval_memory, global_model,
             # global_device, save_gif0, curr_steps, True)
-            evaluate(model, global_device, save_gif, False)
+            evaluate(model, global_device, False)
     except KeyboardInterrupt:
         print("CTRL-C pressed. killing remote workers")
 
@@ -55,18 +53,57 @@ def main():
         wandb.finish()
 
 
-def evaluate(model, device, save_gif, greedy):
+def evaluate(model, device, greedy):
     """Evaluate Model."""
     episodePerformances = []
     fixedEpisodeInfos = []
     for i in range(EvalParameters.EPISODES):
-        original_env = MapfGym()
-        obstaclesMap = original_env.obstacleMap
-        agentStartsList = [Sequence([agent.getPos(type='mat')]) for agent in original_env.agentList]
-        agentGoalsList = [Sequence([agent.getGoal(type='mat')]) for agent in original_env.agentList]
-        humanStart = original_env.human.position
-        humanGoal = original_env.human.goal
-        fixedEpisodeInfos.append((obstaclesMap, agentStartsList, agentGoalsList, humanStart, humanGoal))
+        obstacleMap = generateWarehouse(num_block=EnvParameters.WORLD_SIZE)
+        humanStart = Human.getEntrance(obstacleMap)
+        humanGoal = getFreeCell(obstacleMap)
+        obstacleMap[returnAsType(humanStart,'mat')] = 1
+        # human_path = astar_4(obstacleMap, humanStart, humanGoal)[0]
+        # human_path =  human_path[::-1]
+        agentStartsList = []
+        # Generate the starting pos for agents while respecting other agents' spawning point
+        for agentIdx in range(len(EvalParameters.N_AGENTS)):
+            agentStart = np.array(getFreeCell(obstacleMap))
+            obstacleMap[agentStart] = 2
+            agentStartsList.append(agentStart)
+        
+        pathLengths = [0 for _ in range(EvalParameters.N_AGENTS)]
+        step = 0
+        agentGoalSequences = [Sequence() for _ in range(len(EvalParameters.N_AGENTS))]
+        goalSequencesComplete = [False for _ in range(EvalParameters.N_AGENTS)]
+        while not np.all(goalSequencesComplete):
+            for agentIdx in range(len(EvalParameters.N_AGENTS)):
+                if goalSequencesComplete[agentIdx]:
+                    continue
+                agentGoalSequence = agentGoalSequences[agentIdx]
+                if step == 0:
+                    agentStart = agentStartsList[agentIdx]
+                else:
+                    agentStart = agentGoalSequence.getAtPos(-1)
+                agentGoal = getFreeCell(obstacleMap)
+                obstacleMap[np.array(agentGoal)] = 3
+                
+                agentGoalSequence.add(agentGoal)
+                
+                optimalAgentPath = astar_4(obstacleMap, agentStart, agentGoal)
+                pathLengths[agentIdx] += optimalAgentPath
+                if pathLengths[agentIdx] > EvalParameters.MAX_STEPS:
+                    goalSequencesComplete[agentIdx] = True
+            if step == 0:
+                # Free the starting point of all agents to generate consecutive goals
+                for agentStart in agentStartsList:
+                    obstacleMap[agentStart] = 0
+            else:
+                # Free the previous goal
+                for agentGoalSequence in agentGoalSequences:
+                    obstacleMap[np.array(agentGoalSequence.getAtPos(-2))] = 0
+            step +=1
+        agentStartsList = [tuple(agentStart) for agentStart in agentStartsList]
+        fixedEpisodeInfos.append((obstacleMap, agentStartsList, agentGoalSequences, humanStart, humanGoal))
     
     for model_name, net_path_checkpoint in EvalParameters.MODELS:
         net_dict = torch.load(net_path_checkpoint)
@@ -87,11 +124,10 @@ def evaluate(model, device, save_gif, greedy):
             hidden_state = (torch.zeros((numAgent, NetParameters.NET_SIZE )).to(device),
                             torch.zeros((numAgent, NetParameters.NET_SIZE )).to(device))
 
-            if save_gif:
-                episode_frames.append(env._render())
+            episode_frames.append(env._render())
 
             # stepping
-            for _ in range(TrainingParameters.N_STEPS):
+            for _ in range(EvalParameters.MAX_STEPS):
 
                 # predict
                 actions, pre_block, hidden_state, v, ps = \
@@ -130,8 +166,7 @@ def evaluate(model, device, save_gif, greedy):
 
                 obs, vecs = env.getAllObservations() 
 
-                if save_gif:
-                    episode_frames.append(env._render())
+                episode_frames.append(env._render())
                     
             if RecordingParameters.WANDB:
                 # write_to_wandb(curr_steps, greedy_eval_performance_dict, evaluate=True, greedy=True)
@@ -142,19 +177,15 @@ def evaluate(model, device, save_gif, greedy):
                     
             episodePerformances.append(oneEpisodePerformance)
 
-            # save gif
-            if save_gif:
-                if not os.path.exists(RecordingParameters.GIFS_PATH):
-                    os.makedirs(RecordingParameters.GIFS_PATH)
-                images = np.array(episode_frames[:-1])
-                if EnvParameters.LIFELONG:
-                    make_gif(images,
-                        '{}/episode_{:d}_reward{:.1f}_human_coll{:.1f}_totalGoals{}_shadowGoals{}_staticColl{:d}_agentColl{:d}.gif'.format(
-                            RecordingParameters.GIFS_PATH,
-                            curr_episode, oneEpisodePerformance.episodeReward,
-                            oneEpisodePerformance.humanCollide, oneEpisodePerformance.totalGoals,
-                            oneEpisodePerformance.shadowGoals, oneEpisodePerformance.staticCollide, oneEpisodePerformance.agentCollide))
-                save_gif = True
+            if not os.path.exists(RecordingParameters.GIFS_PATH):
+                os.makedirs(RecordingParameters.GIFS_PATH)
+            images = np.array(episode_frames[:-1])
+            make_gif(images,
+                '{}/episode_{:d}_reward{:.1f}_human_coll{:.1f}_totalGoals{}_shadowGoals{}_staticColl{:d}_agentColl{:d}.gif'.format(
+                    RecordingParameters.GIFS_PATH,
+                    curr_episode, oneEpisodePerformance.episodeReward,
+                    oneEpisodePerformance.humanCollide, oneEpisodePerformance.totalGoals,
+                    oneEpisodePerformance.shadowGoals, oneEpisodePerformance.staticCollide, oneEpisodePerformance.agentCollide))
     return episodePerformances
 
 if __name__ == "__main__":

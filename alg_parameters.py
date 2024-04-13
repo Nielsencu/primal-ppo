@@ -3,6 +3,8 @@ import datetime
 """ Hyperparameters """
 
 class EvalParameters:
+    N_AGENTS = 2
+    MAX_STEPS = 2 ** 8
     EPISODES = 100
     MODELS = [("PPOLag", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl")]
 

@@ -12,15 +12,27 @@ import cv2
 from alg_parameters import *
 
 class Sequence:
-    def __init__(self, goals : list[tuple[int,int]]):
-        self.goals = goals
+    def __init__(self):
+        self.items : list[tuple[int,int]] = []
         self.curIdx = 0
         
+    def add(self, item):
+        self.items.append(item)
+        
+    def getAtPos(self, pos : int) -> tuple[int, int] | None:
+        if len(self.items) == 0:
+            print("Empty items!!")
+            return None
+        if pos >= len(self.items):
+            print("Invalid pos ", pos)
+            return None
+        return self.items[pos]
+        
     def getNext(self) -> tuple[int, int]:
-        if self.curIdx == len(self.goals):
+        if self.curIdx == len(self.items):
             print("No more goals to retrieve!! Returning last goal...")
-            return self.goals[-1]
-        goal = self.goals[self.curIdx]
+            return self.items[-1]
+        goal = self.items[self.curIdx]
         self.curIdx +=1
         return goal
 
