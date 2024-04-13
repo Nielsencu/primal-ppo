@@ -12,8 +12,9 @@ from util import set_global_seeds, write_to_wandb_with_run, make_gif, OneEpPerfo
 from map_generator import generateWarehouse
 from mapf_gym import Human
 from astar_4 import astar_4
+import json
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 print("Welcome to MAPF!\n")
 
 def main():
@@ -24,7 +25,7 @@ def main():
 
     # create classes
     global_device = torch.device('cuda') if SetupParameters.USE_GPU_GLOBAL else torch.device('cpu')
-    model = Model(0, global_device, True)
+    model = Model(0, global_device, True, numChannel=NetParameters.NUM_CHANNEL)
     # Start evaluation
     try:
         # get data from multiple processes
@@ -45,6 +46,9 @@ def evaluate(model, device, greedy):
     """Evaluate Model."""
     episodePerformances = []
     fixedEpisodeInfos = []
+    all_metrics = {}
+    
+    metrics = {'hc' : [], 'ecr' : [], 'cv' : [], 'goals' : []}
     for i in range(EvalParameters.EPISODES):
         obstacleMap = generateWarehouse(num_block=EnvParameters.WORLD_SIZE)
         tempMap = np.copy(obstacleMap)
@@ -85,7 +89,11 @@ def evaluate(model, device, greedy):
     
     for model_name, net_path_checkpoint in EvalParameters.MODELS:
         net_dict = torch.load(net_path_checkpoint)
-        model.network.load_state_dict(net_dict['model'])
+        try:
+            model.network.load_state_dict(net_dict['model'])
+        except Exception as e:
+            print("Failed initializing model with # channel ", NetParameters.NUM_CHANNEL, " trying 5...")
+            model = Model(0, device, True, numChannel=5)
         if RecordingParameters.WANDB:
             wandb_id = wandb.util.generate_id()
             run = wandb.init(project=RecordingParameters.EXPERIMENT_PROJECT,
@@ -167,7 +175,11 @@ def evaluate(model, device, greedy):
                         model_name,
                         curr_episode, oneEpisodePerformance.episodeReward, oneEpisodePerformance.episodeCostReward, oneEpisodePerformance.humanCollide, 
                         oneEpisodePerformance.staticCollide, oneEpisodePerformance.agentCollide, oneEpisodePerformance.totalGoals, oneEpisodePerformance.shadowGoals)) 
-                    
+                
+            metrics['hc'].append(oneEpisodePerformance.humanCollide)
+            metrics['cv'].append(oneEpisodePerformance.constraintViolations)
+            metrics['ecr'].append(oneEpisodePerformance.episodeCostReward)
+            metrics['goals'].append(oneEpisodePerformance.totalGoals)
             episodePerformances.append(oneEpisodePerformance)
 
             if not os.path.exists(RecordingParameters.GIFS_PATH):
@@ -183,6 +195,23 @@ def evaluate(model, device, greedy):
         # killing
         if RecordingParameters.WANDB:
             wandb.finish()
+            
+        for key, val in metrics.items():
+            val = np.array(val)
+            valMean = np.mean(val)
+            valStd = np.std(val)
+            meanPerAgent = valMean / EvalParameters.N_AGENTS
+            stdPerAgent = valStd / EvalParameters.N_AGENTS
+            meanPerAgentPerTimestep = meanPerAgent / EvalParameters.MAX_STEPS
+            stdPerAgentPerTimestep = stdPerAgent / EvalParameters.MAX_STEPS
+            
+            all_metrics[f"{model_name}/{key}_per_agent/mean"] = meanPerAgent
+            all_metrics[f"{model_name}/{key}_per_agent/std"] = stdPerAgent
+            all_metrics[f"{model_name}/{key}_per_agent_per_timestep/mean"] = meanPerAgentPerTimestep
+            all_metrics[f"{model_name}/{key}_per_agent_per_timestep/std"] = stdPerAgentPerTimestep
+    with open(EvalParameters.METRICS_JSON_PATH, 'w') as f:
+        print(f"Saving final metrics file to {EvalParameters.METRICS_JSON_PATH}...")
+        json.dump(all_metrics, f, indent=4)    
     return episodePerformances
 
 if __name__ == "__main__":

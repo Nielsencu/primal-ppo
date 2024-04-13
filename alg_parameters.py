@@ -6,9 +6,17 @@ class EvalParameters:
     N_AGENTS = 2
     MAX_STEPS = 2 ** 8
     EPISODES = 3
+    METRICS_JSON_PATH = './all_metrics.json'
     MODELS = [
-        ("PPOLag-V1", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
-        ("PPOLag-V2", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl")
+        ("PPO", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        ("PPO-HP", "../models/HumanAware/vanilla-hp/net_checkpoint.pkl"),
+        ("PPO-DA", "../models/HumanAware/vanilla-da/net_checkpoint.pkl"),
+        # ("PPO-HP+DA", "../models/HumanAware/vanilla-da/net_checkpoint.pkl"),
+        # ("PPOL-HP", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        # ("PPOL-HP+DA", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        # ("PPOL-HP+DA(PIDL-0.5)", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        # ("PPOL-HP+DA(PIDL-0.95)", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        # ("PPOL-HP+DA+CPPO-PID", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
     ]
 
 class EnvParameters:

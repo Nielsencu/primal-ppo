@@ -38,7 +38,7 @@ def weights_init(m):
 class SCRIMPNet(nn.Module):
     """network with transformer-based communication mechanism"""
 
-    def __init__(self):
+    def __init__(self, numChannel = None):
         """initialization"""
         super(SCRIMPNet, self).__init__()
         self.L = 16
@@ -49,9 +49,12 @@ class SCRIMPNet(nn.Module):
         self.depth = 2
         self.emb_dropout = 0.2
         self.transformer_dropout = 0.2
+        self.num_channel = NetParameters.NUM_CHANNEL
+        if numChannel is not None:
+            self.num_channel = numChannel
 
         # observation encoder
-        self.conv1 = nn.Conv2d(NetParameters.NUM_CHANNEL, NetParameters.NET_SIZE // 4, 3, 1, 1)
+        self.conv1 = nn.Conv2d(self.num_channel, NetParameters.NET_SIZE // 4, 3, 1, 1)
         self.conv1a = nn.Conv2d(NetParameters.NET_SIZE // 4, NetParameters.NET_SIZE // 4, 3, 1, 1)
         self.conv1b = nn.Conv2d(NetParameters.NET_SIZE // 4, NetParameters.NET_SIZE // 4, 3, 1, 1)
         self.pool1 = nn.MaxPool2d(2)
@@ -99,7 +102,7 @@ class SCRIMPNet(nn.Module):
     def forward(self, obs, vector, input_state):
         """run neural network"""
         num_agent = EnvParameters.N_AGENTS
-        obs = torch.reshape(obs, (-1, NetParameters.NUM_CHANNEL, EnvParameters.FOV_SIZE, EnvParameters.FOV_SIZE))
+        obs = torch.reshape(obs, (-1, self.num_channel, EnvParameters.FOV_SIZE, EnvParameters.FOV_SIZE))
         vector = torch.reshape(vector, (-1, NetParameters.VECTOR_LEN))
         # matrix input
         x_1 = F.relu(self.conv1(obs))

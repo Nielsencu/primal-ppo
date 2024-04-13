@@ -13,11 +13,11 @@ import lagrange
 class Model(object):
     """model0 of agents"""
 
-    def __init__(self, env_id, device, global_model=False):
+    def __init__(self, env_id, device, global_model=False, numChannel=None):
         """initialization"""
         self.ID = env_id
         self.device = device
-        self.network = SCRIMPNet().to(device)  # neural network
+        self.network = SCRIMPNet(numChannel=numChannel).to(device)  # neural network
         if global_model:
             self.net_optimizer = optim.Adam(self.network.parameters(), lr=TrainingParameters.lr)
             self.lagrange : lagrange.Lagrange = lagrange.get_lagrangian(LagrangianParameters.LAGRANGIAN_TYPE, TrainingParameters.COST_LIMIT_PER_AGENT)
