@@ -1,16 +1,13 @@
 from heapq import heappop, heappush
+import numpy as np
 
 # PUSH AGAIN
 def construct_path_from_dict(parents, goal, start):
     current = goal
-    parent = parents[current]
-    path = [parent]
-
-    while parent is not start:
-        temp = parent
-        parent = parents[temp]
-        path.append(parent)
-
+    path = [current]
+    while current is not start:
+        current = parents[current]
+        path.append(current)
     return path
 
 
@@ -30,6 +27,8 @@ def astar_4(grid_world, start, goal):
     g_scores = {}
     parents = {}
     heappush(open_list, (0, 0, start, None))  # f, g, cell, parent
+    if np.linalg.norm(np.array(start) - np.array(goal)) < 0.1:
+        return [], []
 
     while open_list:
         # Move to the best cell
