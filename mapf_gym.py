@@ -11,7 +11,8 @@ class Human(object):
         self.world = np.copy(world)
         self.position = Human.getEntrance(world)
         self.world[self.position] = 1
-        self.getNextGoal()
+        self.goal = getFreeCell(self.world)
+        self.getAstarPath()
         self.step = 0
         
     @staticmethod
@@ -25,24 +26,24 @@ class Human(object):
         if(self.step >= len(self.path)-1):
             self.getNextGoal()
             self.step = 0
-            self.position = self.path[self.step]
         else:
             self.step+=1
-            self.position = self.path[self.step]
+        self.position = self.path[self.step]
     
     def getAstarPath(self):
-        temp = astar_4(self.world, self.position, self.goal)[0]
-        self.path =  temp[::-1]
-        self.path += (temp[1:])
+        print("Searching from ", self.position, " to ", self.goal)
+        path = astar_4(self.world, self.position, self.goal)[0]
+        self.path =  path[::-1]
+        # Human goes from start -> goal -> start
+        self.path += path[1:]
+        print(f'Path is {self.path}')
     
     def getPos(self, type='np'):
         return returnAsType(self.position, type)
     
-    def findGoal(self):
-        self.goal = getFreeCell(self.world)
-    
     def getNextGoal(self):
-        self.findGoal()
+        print("Normal human getnextgoal called!")
+        self.goal = getFreeCell(self.world)
         self.getAstarPath()
 
     def getNextPos(self, type='np'):
@@ -53,16 +54,24 @@ class Human(object):
 
 class LoopingHuman(Human):
     def __init__(self, world=np.zeros((1,1)), startPos : tuple[int, int] | None = None, goalPos: tuple[int, int] | None = None):        
-        super().__init__(world)
         if startPos is None:
             startPos = getFreeCell(self.world)
         if goalPos is None:
             goalPos = getFreeCell(self.world)
-        self.start : tuple[int, int] = startPos
+        self.world = np.copy(world)
+        self.position : tuple[int, int] = startPos
+        self.world[self.position] = 1
         self.goal : tuple[int, int] = goalPos
+        super().getAstarPath()
+        self.step = 0
         
-    def findGoal(self):
-        self.start, self.goal = self.goal, self.start
+    def getNextGoal(self):
+        """
+        Does nothing, since basic human goes from start -> goal -> start,
+        will keep reusing the previous computed path
+        """
+        print("Looping human getnextgoal called!")
+        return
 
 class Agent():
     dirDict = {0: (0, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1), 
@@ -141,12 +150,12 @@ class MapfGym():
         
     def populateMap(self):
         tempMap = np.copy(self.obstacleMap)
-        tempMap[returnAsType(self.human.entrance,'mat')] = 1
-        for agent in self.agentList:
-            agent.setPos(self.getNextStart(tempMap))
+        tempMap[returnAsType(self.human.position,'mat')] = 1
+        for agentId, agent in enumerate(self.agentList):
+            agent.setPos(self.getNextStart(tempMap, agentId))
             tempMap[agent.getPos(type='mat')] = 2
             
-            agent.setGoal(self.getNextGoal(tempMap))
+            agent.setGoal(self.getNextGoal(tempMap, agentId))
             self.makeBfsMap(agent)
             tempMap[agent.getGoal(type='mat')] = 3
 
@@ -588,7 +597,7 @@ class MapfGym():
             if(EnvParameters.LIFELONG):
                 if(np.array_equal(agent.getPos(), agent.getGoal())):
                     goalsReached[agentIdx]+=1
-                    agent.setGoal(self.getNextGoal(self.worldWithAgentsAndGoals()))
+                    agent.setGoal(self.getNextGoal(self.worldWithAgentsAndGoals(), agentIdx))
                     self.makeBfsMap(agent)
 
         self.human.nextStep()
@@ -615,8 +624,8 @@ class FixedMapfGym(MapfGym):
         self.agentList = [Agent() for _ in range(EnvParameters.N_AGENTS)]
         self.obstacleMap = copy.deepcopy(obstaclesMap)
         self.human : Human = LoopingHuman(world=self.obstacleMap, startPos=humanStart, goalPos=humanGoal)
-        self.goalsList : list[Sequence] = agentGoalsList
-        self.startsList : list[Sequence] = agentStartsList
+        self.goalsList : list[Sequence] = copy.deepcopy(agentGoalsList)
+        self.startsList : list[Sequence] = copy.deepcopy(agentStartsList)
         self.populateMap()
         self.allGoodActions = self.getUnconditionallyGoodActions(returnIsNeeded=True)
         
