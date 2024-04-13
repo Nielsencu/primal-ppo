@@ -6,9 +6,9 @@ import wandb
 from util import Sequence
 
 from alg_parameters import SetupParameters, RecordingParameters, EnvParameters, EvalParameters, all_args
-from mapf_gym import FixedMapfGym, MapfGym
+from mapf_gym import FixedMapfGym
 from model import Model
-from util import set_global_seeds, write_to_wandb, make_gif, OneEpPerformance, NetParameters, getFreeCell, returnAsType
+from util import set_global_seeds, write_to_wandb_with_run, make_gif, OneEpPerformance, NetParameters, getFreeCell, returnAsType
 from map_generator import generateWarehouse
 from mapf_gym import Human
 from astar_4 import astar_4
@@ -18,18 +18,6 @@ print("Welcome to MAPF!\n")
 
 def main():
     """main code"""
-    if RecordingParameters.WANDB:
-        wandb_id = wandb.util.generate_id()
-        wandb.init(project=RecordingParameters.EXPERIMENT_PROJECT,
-                   name=RecordingParameters.EXPERIMENT_NAME,
-                   entity=RecordingParameters.ENTITY,
-                   notes=RecordingParameters.EXPERIMENT_NOTE,
-                   config=all_args,
-                   id=wandb_id,
-                   resume='allow')
-        print('id is:{}'.format(wandb_id))
-        print('Launching wandb...\n')
-
     setproctitle.setproctitle(
         RecordingParameters.EXPERIMENT_PROJECT + RecordingParameters.EXPERIMENT_NAME + "@" + RecordingParameters.ENTITY)
     set_global_seeds(SetupParameters.SEED)
@@ -98,6 +86,17 @@ def evaluate(model, device, greedy):
     for model_name, net_path_checkpoint in EvalParameters.MODELS:
         net_dict = torch.load(net_path_checkpoint)
         model.network.load_state_dict(net_dict['model'])
+        if RecordingParameters.WANDB:
+            wandb_id = wandb.util.generate_id()
+            run = wandb.init(project=RecordingParameters.EXPERIMENT_PROJECT,
+                        name=RecordingParameters.EXPERIMENT_NAME + f"_{model_name}",
+                        entity=RecordingParameters.ENTITY,
+                        notes=RecordingParameters.EXPERIMENT_NOTE,
+                        config=all_args,
+                        id=wandb_id,
+                        resume='allow')
+            print('id is:{}'.format(wandb_id))
+            print('Launching wandb...\n')
     
         for i in range(EvalParameters.EPISODES):
             curr_episode = i
@@ -163,8 +162,9 @@ def evaluate(model, device, greedy):
                     
             if RecordingParameters.WANDB:
                 # write_to_wandb(curr_steps, greedy_eval_performance_dict, evaluate=True, greedy=True)
-                write_to_wandb(curr_episode, oneEpisodePerformance, evaluate=True, greedy=False)
-                print('episode: {},episode reward: {}, episode cost reward: {} human_coll: {}, static_coll: {}, agent_coll: {}, total_goals: {} shadow_goals: {} \n'.format(
+                write_to_wandb_with_run(run, curr_episode, oneEpisodePerformance, evaluate=True, greedy=False)
+                print('model: {},episode: {},episode reward: {}, episode cost reward: {} human_coll: {}, static_coll: {}, agent_coll: {}, total_goals: {} shadow_goals: {} \n'.format(
+                        model_name,
                         curr_episode, oneEpisodePerformance.episodeReward, oneEpisodePerformance.episodeCostReward, oneEpisodePerformance.humanCollide, 
                         oneEpisodePerformance.staticCollide, oneEpisodePerformance.agentCollide, oneEpisodePerformance.totalGoals, oneEpisodePerformance.shadowGoals)) 
                     
@@ -174,11 +174,15 @@ def evaluate(model, device, greedy):
                 os.makedirs(RecordingParameters.GIFS_PATH)
             images = np.array(episode_frames[:-1])
             make_gif(images,
-                '{}/episode_{:d}_reward{:.1f}_human_coll{:.1f}_totalGoals{}_shadowGoals{}_staticColl{:d}_agentColl{:d}.gif'.format(
+                '{}/model{}_episode_{:d}_reward{:.1f}_human_coll{:.1f}_totalGoals{}_shadowGoals{}_staticColl{:d}_agentColl{:d}.gif'.format(
                     RecordingParameters.GIFS_PATH,
+                    model_name,
                     curr_episode, oneEpisodePerformance.episodeReward,
                     oneEpisodePerformance.humanCollide, oneEpisodePerformance.totalGoals,
                     oneEpisodePerformance.shadowGoals, oneEpisodePerformance.staticCollide, oneEpisodePerformance.agentCollide))
+        # killing
+        if RecordingParameters.WANDB:
+            wandb.finish()
     return episodePerformances
 
 if __name__ == "__main__":

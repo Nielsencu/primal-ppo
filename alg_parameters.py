@@ -5,8 +5,11 @@ import datetime
 class EvalParameters:
     N_AGENTS = 2
     MAX_STEPS = 2 ** 8
-    EPISODES = 100
-    MODELS = [("PPOLag", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl")]
+    EPISODES = 3
+    MODELS = [
+        ("PPOLag-V1", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        ("PPOLag-V2", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl")
+    ]
 
 class EnvParameters:
     N_AGENTS = 2  # number of agents used in training
@@ -27,7 +30,7 @@ class EnvParameters:
     PENALTY_RADIUS = 5
     CONSTRAINT_VIOLATION_COST = -1.0
     
-    LIFELONG = False
+    LIFELONG = True
 
 
 class TrainingParameters:

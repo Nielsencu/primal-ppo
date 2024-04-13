@@ -268,6 +268,35 @@ def write_to_wandb(step, performance_dict=None, mb_loss=None, imitation_loss=Non
                 wandb.log({'Grad/' + name: val}, step=step)
             else:
                 wandb.log({'Loss/' + name: val}, step=step)
+                
+def write_to_wandb_with_run(run, step, performance_dict=None, mb_loss=None, imitation_loss=None, evaluate=True, greedy=True):
+    """record performance using wandb"""
+    if imitation_loss is not None:
+        run.log({'Loss/Imitation_loss': imitation_loss[0]}, step=step)
+        run.log({'Grad/Imitation_grad': imitation_loss[1]}, step=step)
+        return
+    if evaluate:
+        if greedy:
+            for i in dir(performance_dict):
+                if not i.startswith('__'):
+                    run.log({'Perf_greedy_eval/'+i: getattr(performance_dict, i)}, step=step)
+
+        else:
+            for i in dir(performance_dict):
+                if not i.startswith('__'):
+                    run.log({'Perf_random_eval/'+i: getattr(performance_dict, i)}, step=step)
+
+    else:
+        loss_vals = np.nanmean(mb_loss, axis=0)
+        for i in dir(performance_dict):
+            if not i.startswith('__'):
+                run.log({'Perf/'+i: getattr(performance_dict, i)}, step=step)
+
+        for (val, name) in zip(loss_vals, RecordingParameters.LOSS_NAME):
+            if name == 'grad_norm':
+                run.log({'Grad/' + name: val}, step=step)
+            else:
+                run.log({'Loss/' + name: val}, step=step)
 
 
 def make_gif(images, file_name):
