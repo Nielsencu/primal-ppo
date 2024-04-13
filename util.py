@@ -11,6 +11,19 @@ import cv2
 
 from alg_parameters import *
 
+class Sequence:
+    def __init__(self, goals : list[tuple[int,int]]):
+        self.goals = goals
+        self.curIdx = 0
+        
+    def getNext(self) -> tuple[int, int]:
+        if self.curIdx == len(self.goals):
+            print("No more goals to retrieve!! Returning last goal...")
+            return self.goals[-1]
+        goal = self.goals[self.curIdx]
+        self.curIdx +=1
+        return goal
+
 class BatchValues:
     def __init__(self):
         self.observations = list()

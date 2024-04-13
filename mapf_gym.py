@@ -1,36 +1,25 @@
-import copy
-import math
 import random
-import sys
-
-import gym
 import numpy as np
-from gym import spaces
 
-import matplotlib.pyplot as plt
-
-from matplotlib.colors import hsv_to_rgb
-
-import alg_parameters
 from map_generator import *
-
-from alg_parameters import *
-from od_mstar3 import od_mstar
-from od_mstar3.col_set_addition import NoSolutionError
-
-from util import getFreeCell, returnAsType, renderWorld
-
+from alg_parameters import EnvParameters, NetParameters, TrainingParameters
+import copy
+from util import getFreeCell, returnAsType, renderWorld, Sequence
 
 class Human(object):
     def __init__(self, world=np.zeros((1,1))):
         self.world = np.copy(world)
-        self.entrance = (-1,-1)
-        while self.entrance[0]==-1 or not (self.entrance[0]==0 or self.entrance[1]==0):
-            self.entrance = getFreeCell(world)
-        self.world[self.entrance] = 1
-        self.position = self.entrance
+        self.position = Human.getEntrance(world)
+        self.world[self.position] = 1
         self.getNextGoal()
         self.step = 0
+        
+    @staticmethod
+    def getEntrance(world : np.ndarray):
+        entrance = (-1,-1)
+        while entrance[0]==-1 or not (entrance[0]==0 or entrance[1]==0):
+            entrance = getFreeCell(world)
+        return entrance
     
     def nextStep(self):
         if(self.step >= len(self.path)-1):
@@ -48,9 +37,12 @@ class Human(object):
     
     def getPos(self, type='np'):
         return returnAsType(self.position, type)
-
-    def getNextGoal(self):
+    
+    def findGoal(self):
         self.goal = getFreeCell(self.world)
+    
+    def getNextGoal(self):
+        self.findGoal()
         self.getAstarPath()
 
     def getNextPos(self, type='np'):
@@ -58,7 +50,20 @@ class Human(object):
             return returnAsType(self.path[-1], type)
         else:
             return returnAsType(self.path[self.step+1], type)
+
+class LoopingHuman(Human):
+    def __init__(self, world=np.zeros((1,1)), startPos : tuple[int, int] | None = None, goalPos: tuple[int, int] | None = None):        
+        super().__init__(world)
+        if startPos is None:
+            startPos = getFreeCell(self.world)
+        if goalPos is None:
+            goalPos = getFreeCell(self.world)
+        self.start : tuple[int, int] = startPos
+        self.goal : tuple[int, int] = goalPos
         
+    def findGoal(self):
+        self.start, self.goal = self.goal, self.start
+
 class Agent():
     dirDict = {0: (0, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1), 
                4: (-1, 0), 5: (1, 1), 6: (1, -1), 7: (-1, -1), 8: (-1, 1)}  # x,y operation for corresponding action
@@ -126,27 +131,30 @@ class Agent():
         self.setPos(np.add(self.getPos(), step))
         self.setInvalidActions(2, [self.oppositeAction[action]])
 
-
-
 class MapfGym():
     def __init__(self, num_agents=EnvParameters.N_AGENTS, size=EnvParameters.WORLD_SIZE):
         self.agentList = [Agent() for i in range(num_agents)]
-        self.obstacleMap = generateWarehouse(num_block=size)
-        self.human = Human(world=self.obstacleMap)
+        self.obstacleMap = generateWarehouse(num_block=size) # this is random
+        self.human = Human(world=self.obstacleMap) # this is random
         self.populateMap()
         self.allGoodActions = self.getUnconditionallyGoodActions(returnIsNeeded=True)
-
+        
     def populateMap(self):
         tempMap = np.copy(self.obstacleMap)
         tempMap[returnAsType(self.human.entrance,'mat')] = 1
-        for i in self.agentList:
-            i.setPos(getFreeCell(tempMap))
-            tempMap[i.getPos(type='mat')] = 2
+        for agent in self.agentList:
+            agent.setPos(self.getNextStart(tempMap))
+            tempMap[agent.getPos(type='mat')] = 2
+            
+            agent.setGoal(self.getNextGoal(tempMap))
+            self.makeBfsMap(agent)
+            tempMap[agent.getGoal(type='mat')] = 3
 
-            i.setGoal(getFreeCell(tempMap))
-            self.makeBfsMap(i)
-            tempMap[i.getGoal(type='mat')] = 3
+    def getNextStart(self, worldMap : np.ndarray, agentId : int | None = None):
+        return getFreeCell(worldMap)
 
+    def getNextGoal(self, worldMap : np.ndarray, agentId : int | None = None):
+        return getFreeCell(worldMap)
 
     def worldWithAgents(self):
         world = np.copy(self.obstacleMap)
@@ -580,7 +588,7 @@ class MapfGym():
             if(EnvParameters.LIFELONG):
                 if(np.array_equal(agent.getPos(), agent.getGoal())):
                     goalsReached[agentIdx]+=1
-                    agent.setGoal(getFreeCell(self.worldWithAgentsAndGoals()))
+                    agent.setGoal(self.getNextGoal(self.worldWithAgentsAndGoals()))
                     self.makeBfsMap(agent)
 
         self.human.nextStep()
@@ -601,4 +609,20 @@ class MapfGym():
             goals.append(i.getGoal('mat'))
         return renderWorld(world=self.obstacleMap, agents=agents,goals=goals, human=self.human.getPos('mat'),\
                             humanPath=self.human.path, humanStep=self.human.step)
+        
+class FixedMapfGym(MapfGym):
+    def __init__(self, obstaclesMap : np.ndarray, agentGoalsList : list[Sequence], agentStartsList : list[Sequence], humanStart : tuple[int, int], humanGoal : tuple[int, int]):
+        self.agentList = [Agent() for _ in range(EnvParameters.N_AGENTS)]
+        self.obstacleMap = copy.deepcopy(obstaclesMap)
+        self.human : Human = LoopingHuman(world=self.obstacleMap, startPos=humanStart, goalPos=humanGoal)
+        self.goalsList : list[Sequence] = agentGoalsList
+        self.startsList : list[Sequence] = agentStartsList
+        self.populateMap()
+        self.allGoodActions = self.getUnconditionallyGoodActions(returnIsNeeded=True)
+        
+    def getNextGoal(self, worldMap: np.ndarray, agentId: int | None = None) -> tuple[int, int]:
+        return self.goalsList[agentId].getNext()
+    
+    def getNextStart(self, worldMap: np.ndarray, agentId: int | None = None) -> tuple[int, int]:
+        return self.startsList[agentId].getNext()
         

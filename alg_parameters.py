@@ -2,6 +2,8 @@ import datetime
 
 """ Hyperparameters """
 
+class EvalParameters:
+    FIXED_EVAL = True
 
 class EnvParameters:
     N_AGENTS = 2  # number of agents used in training
