@@ -143,6 +143,10 @@ class MapfGym():
         self.human = Human(world=self.obstacleMap) # this is random
         self.populateMap()
         self.allGoodActions = self.getUnconditionallyGoodActions(returnIsNeeded=True)
+        self.num_channel = NetParameters.NUM_CHANNEL
+        
+        self.use_hp = False
+        self.use_da = False
         
     def populateMap(self):
         tempMap = np.copy(self.obstacleMap)
@@ -223,7 +227,7 @@ class MapfGym():
         top_left = (agent.getPos()[0] - EnvParameters.FOV_SIZE // 2, agent.getPos()[1] - EnvParameters.FOV_SIZE // 2)  # (top, left)
         # print(top_left)
         
-        observations = np.zeros((NetParameters.NUM_CHANNEL, EnvParameters.FOV_SIZE, EnvParameters.FOV_SIZE))  #observations per parameters and FOV Size
+        observations = np.zeros((self.num_channel, EnvParameters.FOV_SIZE, EnvParameters.FOV_SIZE))  #observations per parameters and FOV Size
         # 0: obs map
         # 1: other Agents
         # 2: own goal
@@ -257,10 +261,12 @@ class MapfGym():
                     observations[1,i - top_left[0], j - top_left[1]] = 1
 
                 human_next_pos = np.array(self.human.getNextPos())
-                if TrainingParameters.USE_INFLATED_HUMAN and np.linalg.norm(human_next_pos - np.array([i,j])) <= EnvParameters.PENALTY_RADIUS:
+                # TODO: Fix this, only used for evaluation
+                if self.use_da and TrainingParameters.USE_INFLATED_HUMAN and np.linalg.norm(human_next_pos - np.array([i,j])) <= EnvParameters.PENALTY_RADIUS:
                     observations[4, i - top_left[0], j - top_left[1]] = 1
                     
-                if TrainingParameters.USE_HUMAN_TRAJECTORY_PREDICTION:
+                # TODO: Fix this, only used for evaluation
+                if self.use_hp and self.num_channel == 6 and TrainingParameters.USE_HUMAN_TRAJECTORY_PREDICTION:
                     human_astar_path = self.human.path[1:TrainingParameters.K_TIMESTEP_PREDICT+1]
                     for astar_pt in human_astar_path:
                         if np.linalg.norm(np.array(astar_pt) - np.array([i,j])) <= 0.01:
@@ -295,7 +301,7 @@ class MapfGym():
         return observations, vector
 
     def getAllObservations(self):
-        allObs = np.zeros((1, EnvParameters.N_AGENTS, NetParameters.NUM_CHANNEL , EnvParameters.FOV_SIZE, EnvParameters.FOV_SIZE), dtype=np.float32)
+        allObs = np.zeros((1, EnvParameters.N_AGENTS, self.num_channel , EnvParameters.FOV_SIZE, EnvParameters.FOV_SIZE), dtype=np.float32)
         allVec = np.zeros((1, EnvParameters.N_AGENTS, NetParameters.VECTOR_LEN), dtype=np.float32)
 
         for i in range(0, EnvParameters.N_AGENTS):
@@ -616,13 +622,18 @@ class MapfGym():
                             humanPath=self.human.path, humanStep=self.human.step)
         
 class FixedMapfGym(MapfGym):
-    def __init__(self, obstaclesMap : np.ndarray, agentsSequence : list[Sequence], humanStart : tuple[int, int], humanGoal : tuple[int, int]):
+    def __init__(self, obstaclesMap : np.ndarray, agentsSequence : list[Sequence], humanStart : tuple[int, int], humanGoal : tuple[int, int], numChannel = None, useDA = False, useHP = False):
         self.agentList = [Agent() for _ in range(EnvParameters.N_AGENTS)]
         self.obstacleMap = copy.deepcopy(obstaclesMap)
         self.human : Human = LoopingHuman(world=self.obstacleMap, startPos=humanStart, goalPos=humanGoal)
         self.agentsSequence : list[Sequence] = copy.deepcopy(agentsSequence)
         self.populateMap()
         self.allGoodActions = self.getUnconditionallyGoodActions(returnIsNeeded=True)
+        if numChannel is None:
+            numChannel = NetParameters.NUM_CHANNEL
+        self.num_channel = numChannel
+        self.use_da = useDA
+        self.use_hp = useHP
         
     def getAgentStart(self, worldMap: np.ndarray, agentId: int | None = None):
         return self.agentsSequence[agentId].getNext()

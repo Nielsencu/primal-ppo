@@ -12,7 +12,9 @@ import cv2
 from alg_parameters import *
 
 class Sequence:
-    def __init__(self, itemsIn : list[tuple[int,int]] = []):
+    def __init__(self, itemsIn : list[tuple[int,int]] | None = None):
+        if itemsIn is None:
+            itemsIn = list()
         self.items : list[tuple[int,int]] = itemsIn
         self.curIdx = 0
         

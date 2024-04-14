@@ -18,8 +18,26 @@ import json
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 print("Welcome to MAPF!\n")
 
+channels = [5,6]
+curChannel = 1
+def getOtherChannel():
+    return int(not(curChannel))
+
+def switchChannel():
+    global curChannel
+    curChannel = getOtherChannel()
+
+def createFixedEpisodeInfo():
+    return {'obstacleMap' : [], 'agentsSequence' : [], 'humanStart' : [], 'humanGoal' : [], 'numEpisodes': 0}
+
+def getFixedEpisodeInfosFolder():
+    return EvalParameters.FIXED_EPISODE_INFOS_PATH
+
+def getJsonDir():
+    return f"{getFixedEpisodeInfosFolder()}/infos.json"
+
 def generateFixedEpisodeInfos():
-    fixedEpisodeInfos = {}
+    fixedEpisodeInfos = createFixedEpisodeInfo()
     for i in range(EvalParameters.EPISODES):
         obstacleMap = generateWarehouse(num_block=EnvParameters.WORLD_SIZE)
         tempMap = np.copy(obstacleMap)
@@ -33,7 +51,7 @@ def generateFixedEpisodeInfos():
         for agentIdx in range(EvalParameters.N_AGENTS):
             agentStart = getFreeCell(tempMap)
             tempMap[agentStart] = 2
-            agentsSequence[agentIdx].add(tuple(agentStart))
+            agentsSequence[agentIdx].add(agentStart)
         
         pathLengths = [0 for _ in range(EvalParameters.N_AGENTS)]
         goalSequencesComplete = [False for _ in range(EvalParameters.N_AGENTS)]
@@ -56,31 +74,43 @@ def generateFixedEpisodeInfos():
             # Free the previous previous position
             for agentSequence in agentsSequence:
                 tempMap[agentSequence.getAtPos(-2)] = 0
-        fixedEpisodeInfos['obstacleMap'] = obstacleMap
-        fixedEpisodeInfos['agentsSequence'] = agentsSequence
-        fixedEpisodeInfos['humanStart'] = humanStart
-        fixedEpisodeInfos['humanGoal'] = humanGoal
+        fixedEpisodeInfos['obstacleMap'].append(obstacleMap)
+        fixedEpisodeInfos['agentsSequence'].append(agentsSequence)
+        fixedEpisodeInfos['humanStart'].append(humanStart)
+        fixedEpisodeInfos['humanGoal'].append(humanGoal)
+        fixedEpisodeInfos['numEpisodes'] += 1
     return fixedEpisodeInfos
 
 def saveFixedEpisodeInfos(fixedEpisodeInfos):
     saveDict = copy.deepcopy(fixedEpisodeInfos)
-    obstacleMapPath = EvalParameters.FIXED_EPISODE_INFOS_PATH[:EvalParameters.FIXED_EPISODE_INFOS_PATH.rindex(".")] + "_obstacleMap.npy"
-    print("Saving obs map to ", obstacleMapPath)
-    np.save(obstacleMapPath, saveDict['obstacleMap'])
-    saveDict['obstacleMap'] = obstacleMapPath
-    saveDict['agentsSequence'] = [sequence.items for sequence in saveDict['agentsSequence']]
-    with open(EvalParameters.FIXED_EPISODE_INFOS_PATH, 'w', encoding='utf-8') as f:
-        print(f"Saving fixed episode infos to {EvalParameters.FIXED_EPISODE_INFOS_PATH}")
+    dir = getFixedEpisodeInfosFolder()
+    if not os.path.exists(dir):
+        os.mkdir(dir)
+    obstacleMaps = saveDict['obstacleMap']
+    agentsSequences = saveDict['agentsSequence']
+    for i in range(saveDict['numEpisodes']):
+        obstacleMapFile = f"obstacleMap{i}.npy"
+        np.save(f"{dir}/{obstacleMapFile}", obstacleMaps[i])
+        obstacleMaps[i] = obstacleMapFile
+        
+        agentsSequence = [sequence.items for sequence in agentsSequences[i]]
+        agentsSequences[i] = agentsSequence
+    save_json_dir = getJsonDir()
+    with open(save_json_dir, 'w', encoding='utf-8') as f:
+        print(f"Saving fixed episode infos to {save_json_dir}")
         json.dump(saveDict, f, ensure_ascii=False, indent=4, sort_keys=True)
     
 def loadFixedEpisodeInfos():
-    fixedEpisodeInfos = {}
-    with open(EvalParameters.FIXED_EPISODE_INFOS_PATH) as f:
+    fixedEpisodeInfos = createFixedEpisodeInfo()
+    with open(getJsonDir()) as f:
         json_load = json.load(f)
-    fixedEpisodeInfos['obstacleMap'] = np.load(json_load['obstacleMap'])
-    fixedEpisodeInfos['agentsSequence'] = [Sequence(itemsIn=[tuple(item) for item in items]) for items in json_load['agentsSequence']]
-    fixedEpisodeInfos['humanStart'] = tuple(json_load['humanStart'])
-    fixedEpisodeInfos['humanGoal'] = tuple(json_load['humanGoal'])
+    for i in range(json_load['numEpisodes']):
+        obstacleMapFile = json_load['obstacleMap'][i]
+        obstacleMapPath = f"{getFixedEpisodeInfosFolder()}/{obstacleMapFile}"
+        fixedEpisodeInfos['obstacleMap'].append(np.load(obstacleMapPath))
+        fixedEpisodeInfos['agentsSequence'].append([Sequence(itemsIn=[tuple(item) for item in items]) for items in json_load['agentsSequence'][i]])
+    fixedEpisodeInfos['humanStart'] = [tuple(humanStart) for humanStart in json_load['humanStart']]
+    fixedEpisodeInfos['humanGoal'] = [tuple(humanGoal) for humanGoal in json_load['humanGoal']]
     return fixedEpisodeInfos
 
 def main():
@@ -93,6 +123,7 @@ def main():
     global_device = torch.device('cuda') if SetupParameters.USE_GPU_GLOBAL else torch.device('cpu')
     model = Model(0, global_device, True, numChannel=NetParameters.NUM_CHANNEL)
     if EvalParameters.LOAD_FIXED_EPISODE_INFOS:
+        print("Loading fixed episode infos...")
         fixedEpisodeInfos = loadFixedEpisodeInfos()
     else:
         print("Generating new episode infos....")
@@ -120,13 +151,17 @@ def evaluate(model, device, greedy, fixedEpisodeInfos):
     all_metrics = {}
     metrics = {'hc' : [], 'ecr' : [], 'cv' : [], 'goals' : []}
 
+    numChannel = NetParameters.NUM_CHANNEL
     for model_name, net_path_checkpoint in EvalParameters.MODELS:
-        net_dict = torch.load(net_path_checkpoint)
+        print(f"Evaluating using {model_name}!")
+        net_dict = torch.load(EvalParameters.MODEL_PATH + net_path_checkpoint)
         try:
             model.network.load_state_dict(net_dict['model'])
-        except Exception as e:
-            print("Failed initializing model with # channel ", NetParameters.NUM_CHANNEL, " trying 5...")
-            model = Model(0, device, True, numChannel=5)
+        except Exception:
+            print("Failed initializing model with # channel ", channels[curChannel], f" trying {channels[getOtherChannel()]}...")
+            switchChannel()
+            numChannel = channels[curChannel]
+            model = Model(0, device, True, numChannel=numChannel)
         if RecordingParameters.WANDB:
             wandb_id = wandb.util.generate_id()
             run = wandb.init(project=RecordingParameters.EXPERIMENT_PROJECT,
@@ -144,14 +179,17 @@ def evaluate(model, device, greedy, fixedEpisodeInfos):
             oneEpisodePerformance = OneEpPerformance()
             episode_frames = []
             
-            obstaclesMap = fixedEpisodeInfos['obstacleMap']
-            agentsSequence = fixedEpisodeInfos['agentsSequence']
-            humanStart = fixedEpisodeInfos['humanStart']
-            humanGoal = fixedEpisodeInfos['humanGoal']
+            obstaclesMap = fixedEpisodeInfos['obstacleMap'][i]
+            agentsSequence = fixedEpisodeInfos['agentsSequence'][i]
+            humanStart = fixedEpisodeInfos['humanStart'][i]
+            humanGoal = fixedEpisodeInfos['humanGoal'][i]
             print(f"Episode {i}: HumStart {humanStart} HumGoal {humanGoal}")
             for id, agentSequence in enumerate(agentsSequence):
                 print(f"Agent {id} seq : {agentSequence.items}")
-            env = FixedMapfGym(obstaclesMap, agentsSequence, humanStart, humanGoal)
+            use_danger_area = "DA" in model_name
+            use_human_pred = "HP" in model_name
+            print(f"DA - {use_danger_area} HP - {use_human_pred}")
+            env = FixedMapfGym(obstaclesMap, agentsSequence, humanStart, humanGoal, numChannel=numChannel, useDA=use_danger_area, useHP=use_human_pred)
             
             obs, vecs = env.getAllObservations()
 
@@ -207,10 +245,10 @@ def evaluate(model, device, greedy, fixedEpisodeInfos):
             if RecordingParameters.WANDB:
                 # write_to_wandb(curr_steps, greedy_eval_performance_dict, evaluate=True, greedy=True)
                 write_to_wandb_with_run(run, curr_episode, oneEpisodePerformance, evaluate=True, greedy=False)
-                print('model: {},episode: {},episode reward: {}, episode cost reward: {} human_coll: {}, static_coll: {}, agent_coll: {}, total_goals: {} shadow_goals: {} \n'.format(
-                        model_name,
-                        curr_episode, oneEpisodePerformance.episodeReward, oneEpisodePerformance.episodeCostReward, oneEpisodePerformance.humanCollide, 
-                        oneEpisodePerformance.staticCollide, oneEpisodePerformance.agentCollide, oneEpisodePerformance.totalGoals, oneEpisodePerformance.shadowGoals)) 
+            print('model: {},episode: {},episode reward: {}, episode cost reward: {} human_coll: {}, static_coll: {}, agent_coll: {}, total_goals: {} shadow_goals: {} \n'.format(
+                    model_name,
+                    curr_episode, oneEpisodePerformance.episodeReward, oneEpisodePerformance.episodeCostReward, oneEpisodePerformance.humanCollide, 
+                    oneEpisodePerformance.staticCollide, oneEpisodePerformance.agentCollide, oneEpisodePerformance.totalGoals, oneEpisodePerformance.shadowGoals)) 
                 
             metrics['hc'].append(oneEpisodePerformance.humanCollide)
             metrics['cv'].append(oneEpisodePerformance.constraintViolations)
@@ -222,7 +260,7 @@ def evaluate(model, device, greedy, fixedEpisodeInfos):
                 os.makedirs(RecordingParameters.GIFS_PATH)
             images = np.array(episode_frames[:-1])
             make_gif(images,
-                '{}/model{}_episode_{:d}_reward{:.1f}_human_coll{:.1f}_totalGoals{}_shadowGoals{}_staticColl{:d}_agentColl{:d}.gif'.format(
+                '{}/{}_episode_{:d}_reward{:.1f}_human_coll{:.1f}_totalGoals{}_shadowGoals{}_staticColl{:d}_agentColl{:d}.gif'.format(
                     RecordingParameters.GIFS_PATH,
                     model_name,
                     curr_episode, oneEpisodePerformance.episodeReward,
