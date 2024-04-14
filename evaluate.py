@@ -4,6 +4,7 @@ import setproctitle
 import torch
 import wandb
 from util import Sequence
+import copy
 
 from alg_parameters import SetupParameters, RecordingParameters, EnvParameters, EvalParameters, all_args
 from mapf_gym import FixedMapfGym
@@ -17,38 +18,8 @@ import json
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 print("Welcome to MAPF!\n")
 
-def main():
-    """main code"""
-    setproctitle.setproctitle(
-        RecordingParameters.EXPERIMENT_PROJECT + RecordingParameters.EXPERIMENT_NAME + "@" + RecordingParameters.ENTITY)
-    set_global_seeds(SetupParameters.SEED)
-
-    # create classes
-    global_device = torch.device('cuda') if SetupParameters.USE_GPU_GLOBAL else torch.device('cpu')
-    model = Model(0, global_device, True, numChannel=NetParameters.NUM_CHANNEL)
-    # Start evaluation
-    try:
-        # get data from multiple processes
-        # evaluate training model
-        with torch.no_grad():
-            # greedy_eval_performance_dict = evaluate(eval_env,eval_memory, global_model,
-            # global_device, save_gif0, curr_steps, True)
-            evaluate(model, global_device, False)
-    except KeyboardInterrupt:
-        print("CTRL-C pressed. killing remote workers")
-
-    # killing
-    if RecordingParameters.WANDB:
-        wandb.finish()
-
-
-def evaluate(model, device, greedy):
-    """Evaluate Model."""
-    episodePerformances = []
-    fixedEpisodeInfos = []
-    all_metrics = {}
-    
-    metrics = {'hc' : [], 'ecr' : [], 'cv' : [], 'goals' : []}
+def generateFixedEpisodeInfos():
+    fixedEpisodeInfos = {}
     for i in range(EvalParameters.EPISODES):
         obstacleMap = generateWarehouse(num_block=EnvParameters.WORLD_SIZE)
         tempMap = np.copy(obstacleMap)
@@ -85,8 +56,70 @@ def evaluate(model, device, greedy):
             # Free the previous previous position
             for agentSequence in agentsSequence:
                 tempMap[agentSequence.getAtPos(-2)] = 0
-        fixedEpisodeInfos.append((obstacleMap, agentsSequence, humanStart, humanGoal))
+        fixedEpisodeInfos['obstacleMap'] = obstacleMap
+        fixedEpisodeInfos['agentsSequence'] = agentsSequence
+        fixedEpisodeInfos['humanStart'] = humanStart
+        fixedEpisodeInfos['humanGoal'] = humanGoal
+    return fixedEpisodeInfos
+
+def saveFixedEpisodeInfos(fixedEpisodeInfos):
+    saveDict = copy.deepcopy(fixedEpisodeInfos)
+    obstacleMapPath = EvalParameters.FIXED_EPISODE_INFOS_PATH[:EvalParameters.FIXED_EPISODE_INFOS_PATH.rindex(".")] + "_obstacleMap.npy"
+    print("Saving obs map to ", obstacleMapPath)
+    np.save(obstacleMapPath, saveDict['obstacleMap'])
+    saveDict['obstacleMap'] = obstacleMapPath
+    saveDict['agentsSequence'] = [sequence.items for sequence in saveDict['agentsSequence']]
+    with open(EvalParameters.FIXED_EPISODE_INFOS_PATH, 'w', encoding='utf-8') as f:
+        print(f"Saving fixed episode infos to {EvalParameters.FIXED_EPISODE_INFOS_PATH}")
+        json.dump(saveDict, f, ensure_ascii=False, indent=4, sort_keys=True)
     
+def loadFixedEpisodeInfos():
+    fixedEpisodeInfos = {}
+    with open(EvalParameters.FIXED_EPISODE_INFOS_PATH) as f:
+        json_load = json.load(f)
+    fixedEpisodeInfos['obstacleMap'] = np.load(json_load['obstacleMap'])
+    fixedEpisodeInfos['agentsSequence'] = [Sequence(itemsIn=[tuple(item) for item in items]) for items in json_load['agentsSequence']]
+    fixedEpisodeInfos['humanStart'] = tuple(json_load['humanStart'])
+    fixedEpisodeInfos['humanGoal'] = tuple(json_load['humanGoal'])
+    return fixedEpisodeInfos
+
+def main():
+    """main code"""
+    setproctitle.setproctitle(
+        RecordingParameters.EXPERIMENT_PROJECT + RecordingParameters.EXPERIMENT_NAME + "@" + RecordingParameters.ENTITY)
+    set_global_seeds(SetupParameters.SEED)
+
+    # create classes
+    global_device = torch.device('cuda') if SetupParameters.USE_GPU_GLOBAL else torch.device('cpu')
+    model = Model(0, global_device, True, numChannel=NetParameters.NUM_CHANNEL)
+    if EvalParameters.LOAD_FIXED_EPISODE_INFOS:
+        fixedEpisodeInfos = loadFixedEpisodeInfos()
+    else:
+        print("Generating new episode infos....")
+        fixedEpisodeInfos = generateFixedEpisodeInfos()
+        saveFixedEpisodeInfos(fixedEpisodeInfos)
+    # Start evaluation
+    try:
+        # get data from multiple processes
+        # evaluate training model
+        with torch.no_grad():
+            # greedy_eval_performance_dict = evaluate(eval_env,eval_memory, global_model,
+            # global_device, save_gif0, curr_steps, True)
+            evaluate(model, global_device, False, fixedEpisodeInfos)
+    except KeyboardInterrupt:
+        print("CTRL-C pressed. killing remote workers")
+
+    # killing
+    if RecordingParameters.WANDB:
+        wandb.finish()
+
+
+def evaluate(model, device, greedy, fixedEpisodeInfos):
+    """Evaluate Model."""
+    episodePerformances = []
+    all_metrics = {}
+    metrics = {'hc' : [], 'ecr' : [], 'cv' : [], 'goals' : []}
+
     for model_name, net_path_checkpoint in EvalParameters.MODELS:
         net_dict = torch.load(net_path_checkpoint)
         try:
@@ -111,7 +144,10 @@ def evaluate(model, device, greedy):
             oneEpisodePerformance = OneEpPerformance()
             episode_frames = []
             
-            obstaclesMap, agentsSequence, humanStart, humanGoal = fixedEpisodeInfos[curr_episode]
+            obstaclesMap = fixedEpisodeInfos['obstacleMap']
+            agentsSequence = fixedEpisodeInfos['agentsSequence']
+            humanStart = fixedEpisodeInfos['humanStart']
+            humanGoal = fixedEpisodeInfos['humanGoal']
             print(f"Episode {i}: HumStart {humanStart} HumGoal {humanGoal}")
             for id, agentSequence in enumerate(agentsSequence):
                 print(f"Agent {id} seq : {agentSequence.items}")
@@ -211,7 +247,7 @@ def evaluate(model, device, greedy):
             all_metrics[f"{model_name}/{key}_per_agent_per_timestep/std"] = stdPerAgentPerTimestep
     with open(EvalParameters.METRICS_JSON_PATH, 'w') as f:
         print(f"Saving final metrics file to {EvalParameters.METRICS_JSON_PATH}...")
-        json.dump(all_metrics, f, indent=4)    
+        json.dump(all_metrics, f, indent=4)   
     return episodePerformances
 
 if __name__ == "__main__":

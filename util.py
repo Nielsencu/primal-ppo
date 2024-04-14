@@ -12,8 +12,8 @@ import cv2
 from alg_parameters import *
 
 class Sequence:
-    def __init__(self):
-        self.items : list[tuple[int,int]] = []
+    def __init__(self, itemsIn : list[tuple[int,int]] = []):
+        self.items : list[tuple[int,int]] = itemsIn
         self.curIdx = 0
         
     def add(self, item):

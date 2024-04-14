@@ -7,16 +7,21 @@ class EvalParameters:
     MAX_STEPS = 2 ** 8
     EPISODES = 3
     METRICS_JSON_PATH = './all_metrics.json'
+    FIXED_EPISODE_INFOS_PATH = './fixed_episode_infos'
+    LOAD_FIXED_EPISODE_INFOS = False
     MODELS = [
-        ("PPO", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        # ("PPO", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
         ("PPO-HP", "../models/HumanAware/vanilla-hp/net_checkpoint.pkl"),
         ("PPO-DA", "../models/HumanAware/vanilla-da/net_checkpoint.pkl"),
-        # ("PPO-HP+DA", "../models/HumanAware/vanilla-da/net_checkpoint.pkl"),
-        # ("PPOL-HP", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
-        # ("PPOL-HP+DA", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
-        # ("PPOL-HP+DA(PIDL-0.5)", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
-        # ("PPOL-HP+DA(PIDL-0.95)", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
-        # ("PPOL-HP+DA+CPPO-PID", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        # ("PPO-HP+DA", "../models/HumanAware/vanilla-hp-da/net_checkpoint.pkl"),
+        ("PPOL-HP", "../models/HumanAware/ppolag-hp/net_checkpoint.pkl"),
+        # ("PPOL-DA", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        ("PPOL-HP+DA", "../models/HumanAware/ppolag-hp-da/net_checkpoint.pkl"),
+        ("PPOL-HP+DA(PIDL-0.95)", "../models/HumanAware/ppolag-hp-da-pid95/net_checkpoint.pkl"),
+        # ("PPOL-HP+DA(PIDL-0.5)", "../models/HumanAware/ppolag-hp-da-pid50/net_checkpoint.pkl")
+        ("PPOL-HP+DA(PIDL-0.95)-V2", "../models/HumanAware/ppolag-hp-da-pid95-cppopid/net_checkpoint.pkl"),
+        #("PPOL-HP+DA(PIDL-0.95)-V2", "../models/HumanAware/ppolag-hp-da-pid95-cppopid/net_checkpoint.pkl"),
+        #("PPOL-HP+DA(PIDL-0.95)-V2", "../models/HumanAware/ppolag-hp-da-pid95-cppopid/net_checkpoint.pkl")
     ]
 
 class EnvParameters:
@@ -105,7 +110,7 @@ class SetupParameters:
     NUM_GPU = 1
 class RecordingParameters:
     RETRAIN = False
-    WANDB = True
+    WANDB = False
     TENSORBOARD = False
     TXT_WRITER = True
     ENTITY = 'nielsencugito'
