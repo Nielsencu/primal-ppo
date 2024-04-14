@@ -5,23 +5,25 @@ import datetime
 class EvalParameters:
     N_AGENTS = 2
     MAX_STEPS = 2 ** 8
-    EPISODES = 3
-    METRICS_JSON_PATH = './all_metrics.json'
-    FIXED_EPISODE_INFOS_PATH = './fixed_episode_infos'
+    EPISODES = 100
+    HUMAN_MOVEMENT_TYPE = 0 # 0 FOR LOOPING HUMAN, 1 FOR FIXED GOALS HUMAN
+    METRICS_JSON_PATH = './all_metrics_patrol.json'
+    FIXED_EPISODE_INFOS_PATH = './fixed_episode_infos_patrol'
     LOAD_FIXED_EPISODE_INFOS = False
+    MODEL_PATH = "../"
     MODELS = [
-        # ("PPO", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
-        ("PPO-HP", "../models/HumanAware/vanilla-hp/net_checkpoint.pkl"),
-        ("PPO-DA", "../models/HumanAware/vanilla-da/net_checkpoint.pkl"),
-        # ("PPO-HP+DA", "../models/HumanAware/vanilla-hp-da/net_checkpoint.pkl"),
-        ("PPOL-HP", "../models/HumanAware/ppolag-hp/net_checkpoint.pkl"),
-        # ("PPOL-DA", "../models/HumanAware/ppolag-humpred-dangarea/net_checkpoint.pkl"),
-        ("PPOL-HP+DA", "../models/HumanAware/ppolag-hp-da/net_checkpoint.pkl"),
-        ("PPOL-HP+DA(PIDL-0.95)", "../models/HumanAware/ppolag-hp-da-pid95/net_checkpoint.pkl"),
-        # ("PPOL-HP+DA(PIDL-0.5)", "../models/HumanAware/ppolag-hp-da-pid50/net_checkpoint.pkl")
-        ("PPOL-HP+DA(PIDL-0.95)-V2", "../models/HumanAware/ppolag-hp-da-pid95-cppopid/net_checkpoint.pkl"),
-        #("PPOL-HP+DA(PIDL-0.95)-V2", "../models/HumanAware/ppolag-hp-da-pid95-cppopid/net_checkpoint.pkl"),
-        #("PPOL-HP+DA(PIDL-0.95)-V2", "../models/HumanAware/ppolag-hp-da-pid95-cppopid/net_checkpoint.pkl")
+        # ("PPO",  "ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        ("PPO-HP",  "vanilla-hp/net_checkpoint.pkl"),
+        ("PPO-DA",  "vanilla-da/net_checkpoint.pkl"),
+        # ("PPO-HP+DA",  "vanilla-hp-da/net_checkpoint.pkl"),
+        ("PPOL-HP",  "ppolag-hp/net_checkpoint.pkl"),
+        # ("PPOL-DA",  "ppolag-humpred-dangarea/net_checkpoint.pkl"),
+        ("PPOL-HP+DA",  "ppolag-hp-da/net_checkpoint.pkl"),
+        ("PPOL-HP+DA(PIDL-0.95)",  "ppolag-hp-da-pid95/net_checkpoint.pkl"),
+        # ("PPOL-HP+DA(PIDL-0.5)",  "ppolag-hp-da-pid50/net_checkpoint.pkl")
+        ("PPOL-HP+DA(PIDL-0.95)-V2",  "ppolag-hp-da-pid95-cppopid/net_checkpoint.pkl"),
+        #("PPOL-HP+DA(PIDL-0.95)-V2",  "ppolag-hp-da-pid95-cppopid/net_checkpoint.pkl"),
+        #("PPOL-HP+DA(PIDL-0.95)-V2",  "ppolag-hp-da-pid95-cppopid/net_checkpoint.pkl")
     ]
 
 class EnvParameters:
@@ -110,13 +112,13 @@ class SetupParameters:
     NUM_GPU = 1
 class RecordingParameters:
     RETRAIN = False
-    WANDB = False
+    WANDB = True
     TENSORBOARD = False
     TXT_WRITER = True
     ENTITY = 'nielsencugito'
     TIME = datetime.datetime.now().strftime('%d-%m-%y%H%M')
     EXPERIMENT_PROJECT = 'HumanAware'
-    EXPERIMENT_NAME = 'Vanilla'
+    EXPERIMENT_NAME = 'EVAL-PATROLHUMAN-LOCAL'
     EXPERIMENT_NOTE = 'Handled Swapping coll with Humans'
     SAVE_INTERVAL = 5e5  # interval of saving model0
     BEST_INTERVAL = 0  # interval of saving model0 with the best performance

@@ -212,6 +212,8 @@ def evaluate(model, device, greedy, fixedEpisodeInfos):
             use_danger_area = "DA" in model_name
             use_human_pred = "HP" in model_name
             print(f"DA - {use_danger_area} HP - {use_human_pred}")
+            if EvalParameters.HUMAN_MOVEMENT_TYPE == 0:
+                humanSequence = None
             env = FixedMapfGym(obstaclesMap, agentsSequence, humanStart, humanGoal, numChannel=numChannel, useDA=use_danger_area, useHP=use_human_pred, humanSequence=humanSequence)
             
             obs, vecs = env.getAllObservations()

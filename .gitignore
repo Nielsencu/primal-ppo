@@ -8,3 +8,4 @@ models/
 wandb/
 
 fixed_episode_infos*
+*.json
