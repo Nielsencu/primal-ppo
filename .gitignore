@@ -7,4 +7,4 @@ gifs/
 models/
 wandb/
 
-fixed_episode_infos/
+fixed_episode_infos*
