@@ -183,6 +183,7 @@ def evaluate(model, device, greedy, fixedEpisodeInfos):
             switchChannel()
             numChannel = channels[curChannel]
             model = Model(0, device, True, numChannel=numChannel)
+            model.network.load_state_dict(net_dict['model'])
         if RecordingParameters.WANDB:
             wandb_id = wandb.util.generate_id()
             run = wandb.init(project=RecordingParameters.EXPERIMENT_PROJECT,
