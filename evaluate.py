@@ -20,6 +20,9 @@ print("Welcome to MAPF!\n")
 
 channels = [5,6]
 curChannel = 1
+def getManhattanDistance(a : tuple[int, int], b : tuple[int, int]):
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
 def getOtherChannel():
     return int(not(curChannel))
 
@@ -41,7 +44,7 @@ def calculateStepsForSequence(seq):
     for i in range(len(seq) - 1):
         start = seq[i]
         goal = seq[i+1]
-        total += abs(start[0] - goal[0]) + abs(start[1] - goal[1])
+        total += getManhattanDistance(start, goal)
     return total
 
 def generateFixedEpisodeInfos():
@@ -52,13 +55,14 @@ def generateFixedEpisodeInfos():
         humanStart = Human.getEntrance(tempMap)
         humanPoseSequence = [humanStart]
         tempMap[returnAsType(humanStart,'mat')] = 1
-        while np.sum(np.abs(np.diff(humanPoseSequence, axis=0))) <= EvalParameters.MAX_STEPS:
+        pathLength = 0
+        while pathLength <= EvalParameters.MAX_STEPS:
+            prevGoal = humanPoseSequence[-1]
             humanGoal = getFreeCell(tempMap)
-            # humanPath = astar_4(tempMap, humanPoseSequence[-1], humanGoal)[0]
-            # humanPathLength += len(humanPath)-1
+            pathLength += getManhattanDistance(prevGoal, humanGoal)
+            tempMap[humanGoal] = 1
+            tempMap[humanStart] = 0
             humanPoseSequence.append(humanGoal)
-            tempMap[humanPoseSequence[-1]] = 1
-            tempMap[humanPoseSequence[-2]] = 0
         tempMap[humanPoseSequence[-1]] = 0
         tempMap[returnAsType(humanStart,'mat')] = 1
         agentsSequence = [Sequence() for _ in range(EvalParameters.N_AGENTS)]
@@ -83,8 +87,7 @@ def generateFixedEpisodeInfos():
                 
                 agentSequence.add(agentGoal)
                 
-                optimalAgentPath = astar_4(tempMap, agentStart, agentGoal)[0]
-                pathLengths[agentIdx] += len(optimalAgentPath)-1
+                pathLengths[agentIdx] += getManhattanDistance(agentStart, agentGoal)
                 if pathLengths[agentIdx] > EvalParameters.MAX_STEPS:
                     goalSequencesComplete[agentIdx] = True
             # Free the previous previous position
