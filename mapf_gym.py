@@ -68,6 +68,30 @@ class LoopingHuman(Human):
         will keep reusing the previous computed path
         """
         return
+    
+class FixedPathHuman(Human):
+    def __init__(self, world=np.zeros((1,1)), humanPoseSequence=None):
+        self.world = np.copy(world)        
+        self.position = humanPoseSequence[0]
+        self.world[self.position] = 1
+        self.curGoalIdx = 1
+        self.goal = humanPoseSequence[self.curGoalIdx]
+        self.humanPoseSequence = humanPoseSequence[:]
+        self.getAstarPath()
+        self.step = 0
+        
+    def getAstarPath(self):
+        path = astar_4(self.world, self.position, self.goal)[0]
+        self.path =  path[::-1]
+        
+    def getNextGoal(self):
+        self.curGoalIdx += 1
+        if self.curGoalIdx >= len(self.humanPoseSequence):
+            print("No more human goals to retrieve!!")
+            self.goal = self.humanPoseSequence[-1]
+            return 
+        self.goal = self.humanPoseSequence[self.curGoalIdx]
+        self.getAstarPath()
 
 class Agent():
     dirDict = {0: (0, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1), 
@@ -622,10 +646,13 @@ class MapfGym():
                             humanPath=self.human.path, humanStep=self.human.step)
         
 class FixedMapfGym(MapfGym):
-    def __init__(self, obstaclesMap : np.ndarray, agentsSequence : list[Sequence], humanStart : tuple[int, int], humanGoal : tuple[int, int], numChannel = None, useDA = False, useHP = False):
+    def __init__(self, obstaclesMap : np.ndarray, agentsSequence : list[Sequence], humanStart : tuple[int, int], humanGoal : tuple[int, int], numChannel = None, useDA = False, useHP = False, humanSequence = None):
         self.agentList = [Agent() for _ in range(EnvParameters.N_AGENTS)]
         self.obstacleMap = copy.deepcopy(obstaclesMap)
-        self.human : Human = LoopingHuman(world=self.obstacleMap, startPos=humanStart, goalPos=humanGoal)
+        if humanSequence is None:
+            self.human : Human = LoopingHuman(world=self.obstacleMap, startPos=humanStart, goalPos=humanGoal)
+        else:
+            self.human : Human = FixedPathHuman(world=self.obstacleMap, humanPoseSequence=humanSequence)
         self.agentsSequence : list[Sequence] = copy.deepcopy(agentsSequence)
         self.populateMap()
         self.allGoodActions = self.getUnconditionallyGoodActions(returnIsNeeded=True)

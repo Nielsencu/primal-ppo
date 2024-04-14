@@ -28,7 +28,7 @@ def switchChannel():
     curChannel = getOtherChannel()
 
 def createFixedEpisodeInfo():
-    return {'obstacleMap' : [], 'agentsSequence' : [], 'humanStart' : [], 'humanGoal' : [], 'numEpisodes': 0}
+    return {'obstacleMap' : [], 'agentsSequence' : [], 'humanSequence' : [], 'humanStart' : [], 'humanGoal' : [], 'numEpisodes': 0}
 
 def getFixedEpisodeInfosFolder():
     return EvalParameters.FIXED_EPISODE_INFOS_PATH
@@ -42,10 +42,14 @@ def generateFixedEpisodeInfos():
         obstacleMap = generateWarehouse(num_block=EnvParameters.WORLD_SIZE)
         tempMap = np.copy(obstacleMap)
         humanStart = Human.getEntrance(tempMap)
-        humanGoal = getFreeCell(tempMap)
         tempMap[returnAsType(humanStart,'mat')] = 1
-        # human_path = astar_4(tempMap, humanStart, humanGoal)[0]
-        # human_path =  human_path[::-1]
+        humanPathLength = 0
+        humanPoseSequence = [humanStart]
+        while humanPathLength < EvalParameters.MAX_STEPS:
+            humanGoal = getFreeCell(tempMap)
+            humanPath = astar_4(tempMap, humanPoseSequence[-1], humanGoal)[0]
+            humanPathLength += len(humanPath)-1
+            humanPoseSequence.append(humanGoal)
         agentsSequence = [Sequence() for _ in range(EvalParameters.N_AGENTS)]
         # Generate the starting pos for agents while respecting other agents' spawning point
         for agentIdx in range(EvalParameters.N_AGENTS):
@@ -76,6 +80,7 @@ def generateFixedEpisodeInfos():
                 tempMap[agentSequence.getAtPos(-2)] = 0
         fixedEpisodeInfos['obstacleMap'].append(obstacleMap)
         fixedEpisodeInfos['agentsSequence'].append(agentsSequence)
+        fixedEpisodeInfos['humanSequence'].append(humanPoseSequence)
         fixedEpisodeInfos['humanStart'].append(humanStart)
         fixedEpisodeInfos['humanGoal'].append(humanGoal)
         fixedEpisodeInfos['numEpisodes'] += 1
@@ -109,6 +114,7 @@ def loadFixedEpisodeInfos():
         obstacleMapPath = f"{getFixedEpisodeInfosFolder()}/{obstacleMapFile}"
         fixedEpisodeInfos['obstacleMap'].append(np.load(obstacleMapPath))
         fixedEpisodeInfos['agentsSequence'].append([Sequence(itemsIn=[tuple(item) for item in items]) for items in json_load['agentsSequence'][i]])
+        fixedEpisodeInfos['humanSequence'].append([tuple(pos) for pos in json_load['humanSequence'][i]])
     fixedEpisodeInfos['humanStart'] = [tuple(humanStart) for humanStart in json_load['humanStart']]
     fixedEpisodeInfos['humanGoal'] = [tuple(humanGoal) for humanGoal in json_load['humanGoal']]
     return fixedEpisodeInfos
@@ -183,13 +189,15 @@ def evaluate(model, device, greedy, fixedEpisodeInfos):
             agentsSequence = fixedEpisodeInfos['agentsSequence'][i]
             humanStart = fixedEpisodeInfos['humanStart'][i]
             humanGoal = fixedEpisodeInfos['humanGoal'][i]
+            humanSequence = fixedEpisodeInfos['humanSequence'][i]
             print(f"Episode {i}: HumStart {humanStart} HumGoal {humanGoal}")
             for id, agentSequence in enumerate(agentsSequence):
                 print(f"Agent {id} seq : {agentSequence.items}")
+            print(f"Human seq : {humanSequence}")
             use_danger_area = "DA" in model_name
             use_human_pred = "HP" in model_name
             print(f"DA - {use_danger_area} HP - {use_human_pred}")
-            env = FixedMapfGym(obstaclesMap, agentsSequence, humanStart, humanGoal, numChannel=numChannel, useDA=use_danger_area, useHP=use_human_pred)
+            env = FixedMapfGym(obstaclesMap, agentsSequence, humanStart, humanGoal, numChannel=numChannel, useDA=use_danger_area, useHP=use_human_pred, humanSequence=humanSequence)
             
             obs, vecs = env.getAllObservations()
 
