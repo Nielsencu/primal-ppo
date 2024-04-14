@@ -36,26 +36,38 @@ def getFixedEpisodeInfosFolder():
 def getJsonDir():
     return f"{getFixedEpisodeInfosFolder()}/infos.json"
 
+def calculateStepsForSequence(seq):
+    total = 0
+    for i in range(len(seq) - 1):
+        start = seq[i]
+        goal = seq[i+1]
+        total += abs(start[0] - goal[0]) + abs(start[1] - goal[1])
+    return total
+
 def generateFixedEpisodeInfos():
     fixedEpisodeInfos = createFixedEpisodeInfo()
     for i in range(EvalParameters.EPISODES):
         obstacleMap = generateWarehouse(num_block=EnvParameters.WORLD_SIZE)
         tempMap = np.copy(obstacleMap)
         humanStart = Human.getEntrance(tempMap)
-        tempMap[returnAsType(humanStart,'mat')] = 1
-        humanPathLength = 0
         humanPoseSequence = [humanStart]
-        while humanPathLength < EvalParameters.MAX_STEPS:
+        tempMap[returnAsType(humanStart,'mat')] = 1
+        while np.sum(np.abs(np.diff(humanPoseSequence, axis=0))) <= EvalParameters.MAX_STEPS:
             humanGoal = getFreeCell(tempMap)
-            humanPath = astar_4(tempMap, humanPoseSequence[-1], humanGoal)[0]
-            humanPathLength += len(humanPath)-1
+            # humanPath = astar_4(tempMap, humanPoseSequence[-1], humanGoal)[0]
+            # humanPathLength += len(humanPath)-1
             humanPoseSequence.append(humanGoal)
+            tempMap[humanPoseSequence[-1]] = 1
+            tempMap[humanPoseSequence[-2]] = 0
+        tempMap[humanPoseSequence[-1]] = 0
+        tempMap[returnAsType(humanStart,'mat')] = 1
         agentsSequence = [Sequence() for _ in range(EvalParameters.N_AGENTS)]
         # Generate the starting pos for agents while respecting other agents' spawning point
         for agentIdx in range(EvalParameters.N_AGENTS):
             agentStart = getFreeCell(tempMap)
             tempMap[agentStart] = 2
             agentsSequence[agentIdx].add(agentStart)
+        
         
         pathLengths = [0 for _ in range(EvalParameters.N_AGENTS)]
         goalSequencesComplete = [False for _ in range(EvalParameters.N_AGENTS)]
